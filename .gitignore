@@ -1,0 +1,16 @@
+# debugging stuff
+*.ods#
+*.pyc
+__pycache__
+.other/
+
+#data
+/data
+.env
+*.log
+*.db
+*.html
+!template.html
+
+# personal settings
+config.json
