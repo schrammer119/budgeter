@@ -1,16 +1,13 @@
 # debugging stuff
-*.ods#
 *.pyc
 __pycache__
 .other/
 
 #data
 /data
+/logs
 .env
-*.log
-*.db
-*.html
-!template.html
 
 # personal settings
-config.json
+general.json
+credentials.json

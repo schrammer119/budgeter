@@ -15,6 +15,8 @@ import logging
 import sqlite3
 import smtplib
 import uuid
+import sys
+import os
 from dataclasses import dataclass, field, asdict
 from datetime import date, datetime, timedelta
 from dateutil.relativedelta import relativedelta
@@ -27,18 +29,39 @@ import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
-__version__ = "0.0.2"
+os.makedirs('logs', exist_ok=True)
+os.makedirs('data', exist_ok=True)
+os.makedirs('config', exist_ok=True)
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-    handlers=[
-        logging.FileHandler("logs/budget_analyzer.log"),
-        logging.StreamHandler()
-    ]
-)
-logger = logging.getLogger(__name__)
+__version__ = "0.0.3"
+LOG_FILE_PATH = "logs/budget_analyzer.log"
+
+
+def setup_logger():
+    logger = logging.getLogger(__name__)
+    logger.setLevel(logging.DEBUG)
+    # Remove all handlers
+    for h in logger.handlers[:]:
+        logger.removeHandler(h)
+
+    # Detect if running in VS Code debugger
+    in_vscode = 'VSCODE_PID' in os.environ or 'PYTHONBREAKPOINT' in os.environ
+
+    if in_vscode or sys.stdout.isatty():
+        handler = logging.StreamHandler(sys.stdout)
+    else:
+        handler = logging.FileHandler(LOG_FILE_PATH, encoding='utf-8')
+
+    formatter = logging.Formatter(
+        '%(asctime)s - %(name)s - %(levelname)s - [%(funcName)s:%(lineno)d] - %(message)s',
+        datefmt='%d/%m/%Y %H:%M:%S')
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
+
+    return logger
+
+
+logger = setup_logger()
 
 
 @dataclass
@@ -76,55 +99,207 @@ class Transaction:
 
 
 @dataclass
-class Config:
-    """Configuration for the budget analyzer."""
-    # API Configuration
-    token_url: str
-    api_base: str
-    client_id: str
-    client_secret: str
-    fapi_financial_id: str
-    consent_id: Optional[str] = None
-    psu_ip: str = "127.0.0.1"
-    psu_ua: str = "BudgetAnalyzer/2.0"
-
+class GeneralConfig:
+    """General configuration settings (non-sensitive)."""
     # Environment settings
     sandbox_mode: bool = False
 
-    # SMTP Configuration
-    smtp_server: str
-    smtp_port: int
-    smtp_user: str
-    smtp_password: str
-    email_from: str
-    email_to: str
-
     # Database Configuration
-    db_path: str = "budget_data.db"
+    db_path: str = "data/budget_data.db"
 
     # Categorization
-    categories: Dict[str, str] = field(default_factory=dict)
+    categories: Dict[str, str] = field(default_factory=lambda: {
+        "ica": "Groceries",
+        "coop": "Groceries",
+        "willys": "Groceries",
+        "hemköp": "Groceries",
+        "spotify": "Entertainment",
+        "netflix": "Entertainment",
+        "gym": "Health & Fitness",
+        "apoteket": "Health & Fitness",
+        "sl": "Transportation",
+        "shell": "Transportation",
+        "circle k": "Transportation",
+        "statoil": "Transportation",
+        "parkering": "Transportation",
+        "restaurant": "Dining",
+        "pizzeria": "Dining",
+        "cafe": "Dining",
+        "mc": "Dining",
+        "max": "Dining",
+        "burger": "Dining",
+        "elgiganten": "Electronics",
+        "mediamarkt": "Electronics",
+        "kjell": "Electronics",
+        "inet": "Electronics",
+        "komplett": "Electronics",
+        "hyra": "Housing",
+        "el": "Utilities",
+        "vatten": "Utilities",
+        "tele2": "Utilities",
+        "telenor": "Utilities",
+        "telia": "Utilities",
+        "internet": "Utilities"
+    })
 
     # Reporting
-    templates_dir: str = "templates"
+    templates_dir: str = "config"
+
+    # Request settings
+    psu_ip: str = "127.0.0.1"
+    psu_ua: str = f"BudgetAnalyzer/{__version__}"
+    request_timeout: int = 30
+    retry_attempts: int = 3
+
+    # Email settings (non-sensitive)
+    smtp_server: str = "smtp.gmail.com"
+    smtp_port: int = 587
+
+    # Logging
+    log_level: str = "INFO"
+    log_file: str = LOG_FILE_PATH
+
+
+@dataclass
+class CredentialsConfig:
+    """Sensitive configuration settings (credentials, API keys, etc.)."""
+    # Bank API Configuration
+    token_url: str = "https://auth.lansforsakringar.se/oauth2/token"
+    api_base: str = "https://api.lansforsakringar.se/v2"
+    client_id: str = "your_client_id_here"
+    client_secret: str = "your_client_secret_here"
+    fapi_financial_id: str = "your_fapi_financial_id_here"
+    consent_id: Optional[str] = None
+
+    # SMTP Credentials
+    smtp_user: str = "your_email@gmail.com"
+    smtp_password: str = "your_app_password_here"
+    email_from: str = "your_email@gmail.com"
+    email_to: str = "your_email@gmail.com"
+
+
+@dataclass
+class Config:
+    """Combined configuration for the budget analyzer."""
+    general: GeneralConfig
+    credentials: CredentialsConfig
 
     @staticmethod
-    def load(path: str = "config.json") -> "Config":
-        """Load configuration from JSON file."""
+    def load(config_dir: str = "config") -> "Config":
+        """Load configuration from config directory."""
+        config_path = Path(config_dir)
+        general_file = config_path / "general.json"
+        credentials_file = config_path / "credentials.json"
+
+        # Create config directory if it doesn't exist
+        config_path.mkdir(exist_ok=True)
+
+        # Load or create general config
+        if general_file.exists():
+            try:
+                with open(general_file, "r", encoding="utf-8") as f:
+                    general_data = json.load(f)
+                general_config = GeneralConfig(**general_data)
+                logger.info(
+                    f"General configuration loaded from {general_file}")
+            except (json.JSONDecodeError, TypeError) as e:
+                logger.error(
+                    f"Invalid JSON in general configuration file: {e}")
+                logger.info("Creating new general configuration file")
+                general_config = GeneralConfig()
+                Config._save_general_config(general_config, general_file)
+        else:
+            logger.info(
+                f"General configuration file not found, creating {general_file}")
+            general_config = GeneralConfig()
+            Config._save_general_config(general_config, general_file)
+
+        # Load or create credentials config
+        if credentials_file.exists():
+            try:
+                with open(credentials_file, "r", encoding="utf-8") as f:
+                    credentials_data = json.load(f)
+                credentials_config = CredentialsConfig(**credentials_data)
+                logger.info(
+                    f"Credentials configuration loaded from {credentials_file}")
+            except (json.JSONDecodeError, TypeError) as e:
+                logger.error(
+                    f"Invalid JSON in credentials configuration file: {e}")
+                logger.info("Creating new credentials configuration file")
+                credentials_config = CredentialsConfig()
+                Config._save_credentials_config(
+                    credentials_config, credentials_file)
+        else:
+            logger.info(
+                f"Credentials configuration file not found, creating {credentials_file}")
+            credentials_config = CredentialsConfig()
+            Config._save_credentials_config(
+                credentials_config, credentials_file)
+
+        # Check if credentials need to be configured
+        if (credentials_config.client_id == "your_client_id_here" or
+                credentials_config.client_secret == "your_client_secret_here"):
+            logger.warning(
+                "⚠️  Credentials configuration contains default values!")
+            logger.warning(
+                f"Please edit {credentials_file} with your actual API credentials")
+
+        return Config(general=general_config, credentials=credentials_config)
+
+    @staticmethod
+    def _save_general_config(config: GeneralConfig, file_path: Path):
+        """Save general configuration to file."""
         try:
-            with open(path, "r", encoding="utf-8") as f:
-                data = json.load(f)
-            logger.info(f"Configuration loaded from {path}")
-            return Config(**data)
-        except FileNotFoundError:
-            logger.error(f"Configuration file {path} not found")
-            raise
-        except json.JSONDecodeError as e:
-            logger.error(f"Invalid JSON in configuration file: {e}")
-            raise
+            with open(file_path, "w", encoding="utf-8") as f:
+                json.dump(asdict(config), f, indent=2, ensure_ascii=False)
+            logger.info(f"General configuration saved to {file_path}")
         except Exception as e:
-            logger.error(f"Failed to load configuration: {e}")
+            logger.error(f"Failed to save general configuration: {e}")
             raise
+
+    @staticmethod
+    def _save_credentials_config(config: CredentialsConfig, file_path: Path):
+        """Save credentials configuration to file."""
+        try:
+            config_dict = asdict(config)
+
+            # Add comments to the JSON for better user experience
+            config_with_comments = {
+                "_comment": [
+                    "This file contains sensitive credentials - keep it secure!",
+                    "Replace the placeholder values with your actual credentials:",
+                    "- Get API credentials from Länsförsäkringar Developer Portal",
+                    "- For Gmail SMTP, use an App Password, not your regular password",
+                    "- Never commit this file to version control"
+                ],
+                **config_dict
+            }
+
+            with open(file_path, "w", encoding="utf-8") as f:
+                json.dump(config_with_comments, f,
+                          indent=2, ensure_ascii=False)
+
+            # Set restrictive permissions on credentials file (Unix-like systems)
+            try:
+                file_path.chmod(0o600)  # Read/write for owner only
+            except (AttributeError, OSError):
+                pass  # Windows or permission error
+
+            logger.info(f"Credentials configuration saved to {file_path}")
+        except Exception as e:
+            logger.error(f"Failed to save credentials configuration: {e}")
+            raise
+
+    def save(self, config_dir: str = "config"):
+        """Save both configuration files."""
+        config_path = Path(config_dir)
+        config_path.mkdir(exist_ok=True)
+
+        general_file = config_path / "general.json"
+        credentials_file = config_path / "credentials.json"
+
+        self._save_general_config(self.general, general_file)
+        self._save_credentials_config(self.credentials, credentials_file)
 
 
 class BankAPIError(Exception):
@@ -145,10 +320,10 @@ class BankAPI:
         self._session = self._create_session()
 
         # Adjust URLs for sandbox mode
-        if cfg.sandbox_mode:
-            self.cfg.token_url = self.cfg.token_url.replace(
+        if cfg.general.sandbox_mode:
+            self.cfg.credentials.token_url = self.cfg.credentials.token_url.replace(
                 "/oauth2/", "/sandbox/oauth2/")
-            self.cfg.api_base = self.cfg.api_base.replace(
+            self.cfg.credentials.api_base = self.cfg.credentials.api_base.replace(
                 "/v2/", "/sandbox/v2/")
             logger.info("Running in sandbox mode")
 
@@ -156,7 +331,8 @@ class BankAPI:
         """Create a requests session with retry strategy."""
         session = requests.Session()
         retry_strategy = Retry(
-            total=3,
+            total=self.cfg.general.retry_attempts,
+
             backoff_factor=1,
             status_forcelist=[429, 500, 502, 503, 504],
         )
@@ -175,21 +351,21 @@ class BankAPI:
         data = {
             "grant_type": "client_credentials",
             "scope": "AIS",
-            "client_id": self.cfg.client_id,
-            "client_secret": self.cfg.client_secret,
+            "client_id": self.cfg.credentials.client_id,
+            "client_secret": self.cfg.credentials.client_secret,
         }
 
         headers = {
             "Content-Type": "application/x-www-form-urlencoded",
-            "x-fapi-financial-id": self.cfg.fapi_financial_id,
+            "x-fapi-financial-id": self.cfg.credentials.fapi_financial_id,
         }
 
         try:
             response = self._session.post(
-                self.cfg.token_url,
+                self.cfg.credentials.token_url,
                 data=data,
                 headers=headers,
-                timeout=30
+                timeout=self.cfg.general.request_timeout
             )
             response.raise_for_status()
 
@@ -212,20 +388,21 @@ class BankAPI:
         """Get headers for API requests."""
         return {
             "Authorization": f"Bearer {self.authenticate()}",
-            "x-fapi-financial-id": self.cfg.fapi_financial_id,
+            "x-fapi-financial-id": self.cfg.credentials.fapi_financial_id,
             "X-Request-ID": str(uuid.uuid4()),
             "Accept": "application/json",
-            "PSU-IP-Address": self.cfg.psu_ip,
-            "PSU-User-Agent": self.cfg.psu_ua,
+            "PSU-IP-Address": self.cfg.general.psu_ip,
+            "PSU-User-Agent": self.cfg.general.psu_ua,
         }
 
     def list_accounts(self) -> List[Dict[str, Any]]:
         """List all accounts for the authenticated user."""
-        url = f"{self.cfg.api_base}/accounts"
+        url = f"{self.cfg.credentials.api_base}/accounts"
         headers = self._get_headers()
 
         try:
-            response = self._session.get(url, headers=headers, timeout=30)
+            response = self._session.get(
+                url, headers=headers, timeout=self.cfg.general.request_timeout)
             response.raise_for_status()
 
             data = response.json()
@@ -245,7 +422,7 @@ class BankAPI:
         end_date: date
     ) -> List[Dict[str, Any]]:
         """Get transactions for a specific account within a date range."""
-        url = f"{self.cfg.api_base}/accounts/{account_id}/transactions"
+        url = f"{self.cfg.credentials.api_base}/accounts/{account_id}/transactions"
         headers = self._get_headers()
 
         params = {
@@ -301,7 +478,7 @@ class DatabaseManager:
     def init_database(self):
         """Initialize the database schema."""
         try:
-            with sqlite3.connect(self.db_path) as conn:
+            with sqlite3.connect(str(Path(self.db_path).absolute().resolve())) as conn:
                 conn.execute('''
                     CREATE TABLE IF NOT EXISTS transactions (
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -434,12 +611,12 @@ class BudgetAnalyzer:
     def __init__(self, cfg: Config):
         self.cfg = cfg
         self.bank_api = BankAPI(cfg)
-        self.db = DatabaseManager(cfg.db_path)
+        self.db = DatabaseManager(cfg.general.db_path)
         self.jinja_env = Environment(
-            loader=FileSystemLoader(cfg.templates_dir))
+            loader=FileSystemLoader(cfg.general.templates_dir))
 
         # Create templates directory if it doesn't exist
-        Path(cfg.templates_dir).mkdir(exist_ok=True)
+        Path(cfg.general.templates_dir).mkdir(exist_ok=True)
 
     def _get_date_range(self, target_month: Optional[date] = None) -> Tuple[date, date]:
         """Get date range for budget analysis (25th to 24th cycle)."""
@@ -464,7 +641,7 @@ class BudgetAnalyzer:
 
             desc_lower = tx.description.lower()
             tx.category = next(
-                (category for keyword, category in self.cfg.categories.items()
+                (category for keyword, category in self.cfg.general.categories.items()
                  if keyword.lower() in desc_lower),
                 "Uncategorized"
             )
@@ -733,16 +910,18 @@ class BudgetAnalyzer:
         try:
             msg = MIMEMultipart("alternative")
             msg["Subject"] = subject
-            msg["From"] = self.cfg.email_from
-            msg["To"] = self.cfg.email_from
+            msg["From"] = self.cfg.credentials.email_from
+            msg["To"] = self.cfg.credentials.email_from
 
             html_part = MIMEText(html_content, "html", "utf-8")
             msg.attach(html_part)
 
-            with smtplib.SMTP(self.cfg.smtp_server, self.cfg.smtp_port) as server:
+            with smtplib.SMTP(self.cfg.general.smtp_server, self.cfg.general.smtp_port) as server:
                 server.starttls()
-                server.login(self.cfg.smtp_user, self.cfg.smtp_password)
-                server.send_message(msg, to_addrs=self.cfg.email_to)
+                server.login(self.cfg.credentials.smtp_user,
+                             self.cfg.credentials.smtp_password)
+                server.send_message(
+                    msg, to_addrs=self.cfg.credentials.email_to)
 
             logger.info("Email report sent successfully")
             return True
@@ -785,6 +964,9 @@ class BudgetAnalyzer:
                 "email_sent": False
             }
 
+            with open("data/report.html", "w", encoding="utf-8") as f:
+                f.write(html_report)
+
             # Send email if requested
             if send_email:
                 start_date, end_date = self._get_date_range(target_month)
@@ -811,8 +993,8 @@ def main():
     import argparse
 
     parser = argparse.ArgumentParser(description="Enhanced Budget Analyzer")
-    parser.add_argument("--config", default="config.json",
-                        help="Configuration file path")
+    parser.add_argument("--config", default="config",
+                        help="Configuration directory with general.json and credentials.json")
     parser.add_argument("--init-db", action="store_true",
                         help="Initialize database with historical data")
     parser.add_argument("--dry-run", action="store_true",
@@ -829,6 +1011,27 @@ def main():
     try:
         # Load configuration
         cfg = Config.load(args.config)
+
+        # update logging configuration
+        match cfg.general.log_level:
+            case "CRITICAL" | "FATAL":
+                logger.setLevel(logging.CRITICAL)
+            case "ERROR":
+                logger.setLevel(logging.ERROR)
+            case "WARNING" | "WARN":
+                logger.setLevel(logging.WARNING)
+            case "INFO":
+                logger.setLevel(logging.INFO)
+            case "DEBUG":
+                logger.setLevel(logging.DEBUG)
+            case "NOTSET":
+                logger.setLevel(logging.NOTSET)
+
+        if any(isinstance(h, logging.FileHandler) for h in logger.handlers):
+            # If file handler exists, update its path
+            for handler in logger.handlers:
+                if isinstance(handler, logging.FileHandler):
+                    handler.baseFilename = cfg.general.log_file
 
         # Initialize analyzer
         analyzer = BudgetAnalyzer(cfg)
