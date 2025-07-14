@@ -20,6 +20,7 @@ class Transaction:
     account_id: str
     transaction_id: str
     category: Optional[str] = None
+    merchant: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert transaction to dictionary for JSON serialization."""
@@ -29,7 +30,8 @@ class Transaction:
             'description': self.description,
             'account_id': self.account_id,
             'transaction_id': self.transaction_id,
-            'category': self.category
+            'category': self.category,
+            'merchant': self.merchant
         }
 
     @classmethod
@@ -41,7 +43,8 @@ class Transaction:
             description=data['description'],
             account_id=data['account_id'],
             transaction_id=data['transaction_id'],
-            category=data.get('category')
+            category=data.get('category'),
+            merchant=data.get('merchant')
         )
 
 

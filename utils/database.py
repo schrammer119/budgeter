@@ -30,6 +30,7 @@ class DatabaseManager:
                         account_id TEXT NOT NULL,
                         transaction_id TEXT UNIQUE NOT NULL,
                         category TEXT,
+                        merchant TEXT,
                         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                     )
@@ -64,7 +65,7 @@ class DatabaseManager:
                     try:
                         conn.execute('''
                             INSERT INTO transactions
-                            (date, amount, description, account_id, transaction_id, category)
+                            (date, amount, description, account_id, transaction_id, category, merchant)
                             VALUES (?, ?, ?, ?, ?, ?)
                         ''', (
                             tx.date.isoformat(),
@@ -72,7 +73,8 @@ class DatabaseManager:
                             tx.description,
                             tx.account_id,
                             tx.transaction_id,
-                            tx.category
+                            tx.category,
+                            tx.merchant
                         ))
                         saved_count += 1
                     except sqlite3.IntegrityError:
@@ -80,9 +82,11 @@ class DatabaseManager:
                         if tx.category:
                             conn.execute('''
                                 UPDATE transactions
-                                SET category = ?, updated_at = CURRENT_TIMESTAMP
+                                SET category = ?,
+                                SET merchant = ?,
+                                updated_at = CURRENT_TIMESTAMP
                                 WHERE transaction_id = ?
-                            ''', (tx.category, tx.transaction_id))
+                            ''', (tx.category, tx.merchant, tx.transaction_id))
 
                 conn.commit()
 
@@ -102,7 +106,7 @@ class DatabaseManager:
         try:
             with sqlite3.connect(self.db_path) as conn:
                 cursor = conn.execute('''
-                    SELECT date, amount, description, account_id, transaction_id, category
+                    SELECT date, amount, description, account_id, transaction_id, category, merchant
                     FROM transactions
                     WHERE date BETWEEN ? AND ?
                     ORDER BY date DESC
@@ -116,7 +120,8 @@ class DatabaseManager:
                         description=row[2],
                         account_id=row[3],
                         transaction_id=row[4],
-                        category=row[5]
+                        category=row[5],
+                        merchant=row[6]
                     ))
 
                 logger.info(

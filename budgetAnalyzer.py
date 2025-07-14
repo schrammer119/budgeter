@@ -12,7 +12,12 @@ License: MIT
 
 from utils.database import DatabaseManager
 from utils.fileHandler import FileHandler
-from utils.classes import Transaction, Config, LOG_FILE_PATH
+from utils.classes import (Transaction,
+                           Config,
+                           LOG_FILE_PATH)
+from config.macros import (MERCHANT_TOKENS,
+                           MERCHANT_REGEXES,
+                           MERCHANT_CATEGORIES)
 from typing import Dict, List, Optional, Tuple, Any
 from pathlib import Path
 from jinja2 import Environment, FileSystemLoader
@@ -20,6 +25,7 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from dateutil.relativedelta import relativedelta
 from datetime import date, datetime, timedelta
+from rapidfuzz import process, fuzz
 import os
 import sys
 import logging
@@ -95,27 +101,76 @@ class BudgetAnalyzer:
         Lowercase, strip punctuation & numbers, collapse whitespace.
         """
         text = text.lower()
-        # remove punctuation
-        text = re.sub(r"[^\w\s]", " ", text)
-        # remove digits
-        text = re.sub(r"\d+", " ", text)
+        if sum(c.isalpha() for c in text):
+            # Only remove punctuation and digits if there are alphabetic characters
+            # remove punctuation, except hyphens
+            text = re.sub(r"[^\w\s-]", " ", text)
+            # remove standalone digits
+            text = re.sub(r"(?<![\w-])(?:\d+(?:-\d+)*)(?![\w-])", " ", text)
         # collapse multiple spaces
         text = re.sub(r"\s+", " ", text).strip()
         return text
 
     def _categorize_transactions(self, transactions: List[Transaction]) -> None:
         """Categorize transactions based on description keywords."""
+
         for tx in transactions:
             if tx.category:
                 continue  # Already categorized
-
             norm = self._normalize(tx.description)
-            best, score, _ = rapidfuzz.process.extractOne(
-                norm, self.cfg.general.merchant_keys, scorer=rapidfuzz.fuzz.token_sort_ratio)
+
+            # Rule-based early categorization
+            for token, category in MERCHANT_TOKENS.items():
+                token_norm = self._normalize(token)
+                if len(token_norm) > len(norm):
+                    continue
+                if token_norm in norm:
+                    tx.category = category
+                    tx.merchant = token
+                    break
+            if tx.category:
+                continue  # Already categorized
+
+            # Regex patterns
+            for pattern, category, name in MERCHANT_REGEXES:
+                match = re.search(pattern, norm)
+                if match:
+                    tx.category = category
+                    tx.merchant = name
+                    break
+            if tx.category:
+                continue  # Already categorized
+
+            # Fuzzy matching
+            normalized_to_original = {
+                self._normalize(k): k for k in MERCHANT_CATEGORIES.keys()}
+            normalized_keys = [
+                k for k in normalized_to_original.keys() if len(k) <= len(norm)]
+
+            if not normalized_keys:
+                if tx.amount > 0:
+                    tx.category = "Uncategorized Income"
+                else:
+                    tx.category = "Uncategorized"
+                tx.merchant = tx.description
+                break
+            if tx.category:
+                continue  # Already categorized
+
+            match_list = process.extract(
+                norm, normalized_keys, scorer=fuzz.partial_ratio)
+            best_norm, score, _ = max(
+                match_list, key=lambda x: (x[1], len(x[0])))
+            best = normalized_to_original[best_norm]
             if score >= self.cfg.general.category_threshold:
-                tx.category = self.cfg.general.merchant_categories[best]
+                tx.category = MERCHANT_CATEGORIES[best]
+                tx.merchant = best
             else:
-                tx.category = "Uncategorized"
+                if tx.amount > 0:
+                    tx.category = "Uncategorized Income"
+                else:
+                    tx.category = "Uncategorized"
+                tx.merchant = best
 
     def process_new_files(self) -> List[Transaction]:
         """
@@ -182,64 +237,12 @@ class BudgetAnalyzer:
 
         return transactions
 
-    def init_database(self, dry_run: bool = False):
-        """
-        Initialize database with data from files in input directory.
-
-        Args:
-            dry_run: If True, only simulate the operation without saving data.
-        """
-        logger.info("Initializing database with data from files...")
-
-        try:
-            # Process all files in input directory
-            if dry_run:
-                logger.info("DRY RUN: Simulating file processing")
-                files = self.file_handler.get_new_files()
-                total_transactions = 0
-
-                for file_path in files:
-                    try:
-                        transactions = self.file_handler.parse_file(file_path)
-                        total_transactions += len(transactions)
-                        logger.info(
-                            f"Would process {len(transactions)} transactions from {file_path}")
-                    except Exception as e:
-                        logger.error(f"Failed to parse {file_path}: {e}")
-
-                logger.info(
-                    f"DRY RUN: Would process {total_transactions} total transactions")
-
-            else:
-                # Clean up old data first (keep last year)
-                today = date.today()
-                cutoff_date = today - relativedelta(years=1)
-                self.db.cleanup_old_data(cutoff_date)
-
-                # Process all files
-                all_transactions = self.file_handler.process_new_files()
-
-                if all_transactions:
-                    # Categorize transactions
-                    self._categorize_transactions(all_transactions)
-
-                    # Save to database
-                    saved_count = self.db.save_transactions(all_transactions)
-                    logger.info(
-                        f"Processed {saved_count} transactions from files")
-                else:
-                    logger.warning("No files found to process")
-
-        except Exception as e:
-            logger.error(f"Database initialization failed: {e}")
-            raise
-
     def generate_report(
         self,
         transactions: List[Transaction],
         report_type: str = "monthly",
         target_month: Optional[date] = None
-    ) -> str:
+    ) -> str | None:
         """
         Generate HTML report based on transactions and report type.
 
@@ -291,73 +294,7 @@ class BudgetAnalyzer:
             return template.render(**template_data)
         except Exception as e:
             logger.error(f"Failed to render template {template_name}: {e}")
-            # Fallback to basic template
-            try:
-                template = self.jinja_env.get_template("report_basic.html")
-                return template.render(**template_data)
-            except Exception as e2:
-                logger.error(f"Failed to render basic template: {e2}")
-                # Generate minimal HTML report
-                return self._generate_minimal_report(template_data)
-
-    def _generate_minimal_report(self, data: Dict[str, Any]) -> str:
-        """Generate a minimal HTML report when templates fail."""
-        html = f"""
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <title>Budget Report - {data['report_type'].title()}</title>
-            <style>
-                body {{ font-family: Arial, sans-serif; margin: 20px; }}
-                .header {{ background-color: #f0f0f0; padding: 15px; margin-bottom: 20px; }}
-                .category {{ margin-bottom: 15px; }}
-                .total {{ font-weight: bold; color: #0066cc; }}
-                table {{ border-collapse: collapse; width: 100%; }}
-                th, td {{ border: 1px solid #ddd; padding: 8px; text-align: left; }}
-                th {{ background-color: #f2f2f2; }}
-            </style>
-        </head>
-        <body>
-            <div class="header">
-                <h1>Budget Report - {data['report_type'].title()}</h1>
-                <p>Period: {data['start_date']} to {data['end_date']}</p>
-                <p>Generated: {data['generated_on'].strftime('%Y-%m-%d %H:%M:%S')}</p>
-            </div>
-
-            <h2>Summary</h2>
-            <p><strong>Total Transactions:</strong> {data['total_transactions']}</p>
-            <p><strong>Total Amount:</strong> {data['total_amount']:.2f} SEK</p>
-
-            <h2>By Category</h2>
-            <table>
-                <thead>
-                    <tr>
-                        <th>Category</th>
-                        <th>Amount</th>
-                        <th>Count</th>
-                    </tr>
-                </thead>
-                <tbody>
-        """
-
-        for category, total in data['category_totals'].items():
-            count = len(data['groups'][category])
-            html += f"""
-                    <tr>
-                        <td>{category}</td>
-                        <td>{total:.2f} SEK</td>
-                        <td>{count}</td>
-                    </tr>
-            """
-
-        html += """
-                </tbody>
-            </table>
-        </body>
-        </html>
-        """
-
-        return html
+            return None
 
     def _get_comparative_data(self, target_month: Optional[date], report_type: str) -> Dict[str, Any]:
         """Get comparative data for quarterly and yearly reports."""
@@ -416,44 +353,6 @@ class BudgetAnalyzer:
             logger.error(f"Failed to send email report: {e}")
             return False
 
-    def get_status(self) -> Dict[str, Any]:
-        """Get current status of the budget analyzer."""
-        try:
-            file_summary = self.file_handler.get_file_summary()
-
-            # Get database stats
-            today = date.today()
-            current_month_start, current_month_end = self._get_date_range()
-            current_month_transactions = self.db.get_transactions(
-                current_month_start, current_month_end)
-
-            # Get last 3 months for trend
-            last_3_months = []
-            for i in range(3):
-                month_date = today - relativedelta(months=i)
-                start_date, end_date = self._get_date_range(month_date)
-                transactions = self.db.get_transactions(start_date, end_date)
-                last_3_months.append({
-                    'month': month_date.strftime('%Y-%m'),
-                    'count': len(transactions),
-                    'total': sum(tx.amount for tx in transactions)
-                })
-
-            return {
-                'file_summary': file_summary,
-                'current_month': {
-                    'start_date': current_month_start,
-                    'end_date': current_month_end,
-                    'transaction_count': len(current_month_transactions),
-                    'total_amount': sum(tx.amount for tx in current_month_transactions)
-                },
-                'last_3_months': last_3_months
-            }
-
-        except Exception as e:
-            logger.error(f"Failed to get status: {e}")
-            return {'error': str(e)}
-
     def run_full_analysis(
         self,
         target_month: Optional[date] = None,
@@ -490,17 +389,18 @@ class BudgetAnalyzer:
                 "email_sent": False
             }
 
-            # Save report to file
-            with open("data/report.html", "w", encoding="utf-8") as f:
-                f.write(html_report)
-            logger.info("Report saved to data/report.html")
+            if html_report:
+                # Save report to file
+                with open("data/report.html", "w", encoding="utf-8") as f:
+                    f.write(html_report)
+                logger.info("Report saved to data/report.html")
 
-            # Send email if requested
-            if send_email:
-                start_date, end_date = self._get_date_range(target_month)
-                subject = f"Budget Report ({report_type.title()}) - {start_date} to {end_date}"
-                results["email_sent"] = self.send_email_report(
-                    html_report, subject)
+                # Send email if requested
+                if send_email:
+                    start_date, end_date = self._get_date_range(target_month)
+                    subject = f"Budget Report ({report_type.title()}) - {start_date} to {end_date}"
+                    results["email_sent"] = self.send_email_report(
+                        html_report, subject)
 
             return results
 
@@ -522,12 +422,6 @@ def main():
 
     parser = argparse.ArgumentParser(
         description="Enhanced Budget Analyzer with File Import")
-    parser.add_argument("--config", default="config",
-                        help="Configuration directory with general.json and credentials.json")
-    parser.add_argument("--init-db", action="store_true",
-                        help="Initialize database with data from files")
-    parser.add_argument("--dry-run", action="store_true",
-                        help="Run in dry-run mode (simulation only)")
     parser.add_argument("--report-type", choices=["monthly", "quarterly", "yearly"],
                         default="monthly", help="Type of report to generate")
     parser.add_argument("--no-email", action="store_true",
@@ -536,14 +430,12 @@ def main():
         "--target-month", help="Target month in YYYY-MM format")
     parser.add_argument("--force-import", action="store_true",
                         help="Force processing of files even if data exists")
-    parser.add_argument("--status", action="store_true",
-                        help="Show current status and exit")
 
     args = parser.parse_args()
 
     try:
         # Load configuration
-        cfg = Config.load(args.config)
+        cfg = Config.load()
 
         # Update logging configuration
         match cfg.general.log_level:
@@ -569,15 +461,6 @@ def main():
         # Initialize analyzer
         analyzer = BudgetAnalyzer(cfg)
 
-        # Show status if requested
-        if args.status:
-            status = analyzer.get_status()
-            print("=== Budget Analyzer Status ===")
-            print(f"Files: {status.get('file_summary', {})}")
-            print(f"Current Month: {status.get('current_month', {})}")
-            print(f"Last 3 Months: {status.get('last_3_months', [])}")
-            return
-
         # Parse target month if provided
         target_month = None
         if args.target_month:
@@ -586,13 +469,6 @@ def main():
                     args.target_month, "%Y-%m").date()
             except ValueError:
                 logger.error("Invalid target month format. Use YYYY-MM")
-                return
-
-        # Initialize database if requested
-        if args.init_db:
-            analyzer.init_database(dry_run=args.dry_run)
-            if args.dry_run:
-                logger.info("Dry run completed - no data was saved")
                 return
 
         # Run analysis

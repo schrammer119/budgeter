@@ -12,7 +12,12 @@
             "console": "integratedTerminal",
             "args": [
                 "--dry-run",
-                "--no-email"
+                "--no-email",
+                "--report-type",
+                "monthly",
+                "--target-month",
+                "2025-06",
+                "--force-import"
             ]
         }
     ]
