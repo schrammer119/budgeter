@@ -6,6 +6,8 @@ __pycache__
 #data
 /data
 /logs
+/input
+/processed
 .env
 
 # personal settings
