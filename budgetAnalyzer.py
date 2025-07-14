@@ -10,28 +10,27 @@ Author: Alexander Schramm
 License: MIT
 """
 
-from utils.database import DatabaseManager
-from utils.fileHandler import FileHandler
-from utils.classes import (Transaction,
-                           Config,
-                           LOG_FILE_PATH)
 from config.macros import (MERCHANT_TOKENS,
                            MERCHANT_REGEXES,
                            MERCHANT_CATEGORIES)
-from typing import Dict, List, Optional, Tuple, Any
-from pathlib import Path
-from jinja2 import Environment, FileSystemLoader
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
-from dateutil.relativedelta import relativedelta
+from utils.classes import (Transaction,
+                           Config,
+                           LOG_FILE_PATH)
+from utils.database import DatabaseManager
+from utils.fileHandler import FileHandler
 from datetime import date, datetime, timedelta
+from dateutil.relativedelta import relativedelta
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from jinja2 import Environment, FileSystemLoader
+from pathlib import Path
 from rapidfuzz import process, fuzz
-import os
-import sys
+from typing import Dict, List, Optional, Tuple, Any
 import logging
-import smtplib
-import rapidfuzz
+import os
 import re
+import smtplib
+import sys
 
 os.makedirs('logs', exist_ok=True)
 os.makedirs('data', exist_ok=True)
@@ -95,6 +94,44 @@ class BudgetAnalyzer:
         end_date = base_date.replace(day=24)
 
         return start_date, end_date
+
+    def _get_quarter_range(self, target_month: Optional[date] = None) -> Tuple[date, date]:
+        """Get date range for quarter analysis."""
+        if target_month:
+            base_date = target_month.replace(day=1)
+        else:
+            base_date = date.today().replace(day=1)
+
+        # Determine quarter
+        quarter = ((base_date.month - 1) // 3) + 1
+
+        # Quarter start month
+        quarter_start_month = ((quarter - 1) * 3) + 1
+
+        # Get first day of quarter
+        quarter_start = base_date.replace(month=quarter_start_month, day=1)
+
+        # Get last day of quarter
+        if quarter == 4:
+            quarter_end = base_date.replace(month=12, day=31)
+        else:
+            next_quarter_start = base_date.replace(
+                month=quarter_start_month + 3, day=1)
+            quarter_end = next_quarter_start - timedelta(days=1)
+
+        return quarter_start, quarter_end
+
+    def _get_year_range(self, target_month: Optional[date] = None) -> Tuple[date, date]:
+        """Get date range for year analysis."""
+        if target_month:
+            base_date = target_month.replace(day=1)
+        else:
+            base_date = date.today().replace(day=1)
+
+        year_start = base_date.replace(month=1, day=1)
+        year_end = base_date.replace(month=12, day=31)
+
+        return year_start, year_end
 
     def _normalize(self, text: str) -> str:
         """
@@ -171,6 +208,364 @@ class BudgetAnalyzer:
                 else:
                     tx.category = "Uncategorized"
                 tx.merchant = best
+
+    def recategorize_transactions(self, target_month: Optional[date] = None) -> Dict[str, Any]:
+        """
+        Re-categorize transactions for the specified month using current rules.
+
+        Args:
+            target_month: Target month to re-categorize. If None, uses current month.
+
+        Returns:
+            Dictionary with re-categorization results
+        """
+        start_date, end_date = self._get_date_range(target_month)
+
+        logger.info(
+            f"Re-categorizing transactions for period: {start_date} to {end_date}")
+
+        try:
+            # Get all transactions for the period
+            transactions = self.db.get_transactions(start_date, end_date)
+
+            if not transactions:
+                logger.warning(
+                    f"No transactions found for period {start_date} to {end_date}")
+                return {
+                    "success": False,
+                    "message": "No transactions found for the specified period",
+                    "transactions_processed": 0,
+                    "changes_made": 0
+                }
+
+            # Store original categories for comparison
+            original_categories = {
+                tx.id: (tx.category, tx.merchant) for tx in transactions}
+
+            # Clear existing categorization
+            for tx in transactions:
+                tx.category = None
+                tx.merchant = None
+
+            # Re-categorize using current rules
+            self._categorize_transactions(transactions)
+
+            # Count changes made
+            changes_made = 0
+            updated_transactions = []
+
+            for tx in transactions:
+                original_cat, original_merchant = original_categories.get(
+                    tx.id, (None, None))
+                if tx.category != original_cat or tx.merchant != original_merchant:
+                    updated_transactions.append(tx)
+                    logger.debug(f"Transaction {tx.id}: {original_cat} -> {tx.category}, "
+                                 f"Merchant: {original_merchant} -> {tx.merchant}")
+
+            # Update database with new categorizations
+            if updated_transactions:
+                changes_made = self.db.update_transactions(
+                    updated_transactions)
+                logger.info(
+                    f"Updated {len(updated_transactions)} transactions in database")
+
+            return {
+                "success": True,
+                "transactions_processed": len(transactions),
+                "changes_made": changes_made,
+                "start_date": start_date,
+                "end_date": end_date,
+                "message": f"Re-categorized {len(transactions)} transactions, {changes_made} changes made"
+            }
+
+        except Exception as e:
+            logger.error(f"Failed to re-categorize transactions: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "transactions_processed": 0,
+                "changes_made": 0
+            }
+
+    def _get_quarterly_data(self, target_month: Optional[date] = None) -> Dict[str, Any]:
+        """
+        Get comprehensive quarterly data including current quarter and previous year comparison.
+
+        Args:
+            target_month: Target month for the quarter
+
+        Returns:
+            Dictionary with quarterly analysis data
+        """
+        if not target_month:
+            target_month = date.today()
+
+        # Get current quarter range
+        current_quarter_start, current_quarter_end = self._get_quarter_range(
+            target_month)
+
+        # Get previous year same quarter
+        prev_year_target = target_month - relativedelta(years=1)
+        prev_quarter_start, prev_quarter_end = self._get_quarter_range(
+            prev_year_target)
+
+        # Get transactions for both periods
+        current_quarter_transactions = self.db.get_transactions(
+            current_quarter_start, current_quarter_end)
+        prev_quarter_transactions = self.db.get_transactions(
+            prev_quarter_start, prev_quarter_end)
+
+        # Calculate current quarter metrics
+        current_quarter_total = sum(
+            tx.amount for tx in current_quarter_transactions)
+        current_quarter_categories = {}
+        current_quarter_monthly = {}
+
+        for tx in current_quarter_transactions:
+            # Category totals
+            category = tx.category or "Uncategorized"
+            current_quarter_categories[category] = current_quarter_categories.get(
+                category, 0) + tx.amount
+
+            # Monthly breakdown
+            month_key = tx.date.strftime("%Y-%m")
+            if month_key not in current_quarter_monthly:
+                current_quarter_monthly[month_key] = {
+                    "total": 0, "categories": {}}
+            current_quarter_monthly[month_key]["total"] += tx.amount
+            current_quarter_monthly[month_key]["categories"][category] = \
+                current_quarter_monthly[month_key]["categories"].get(
+                    category, 0) + tx.amount
+
+        # Calculate previous year quarter metrics
+        prev_quarter_total = sum(tx.amount for tx in prev_quarter_transactions)
+        prev_quarter_categories = {}
+
+        for tx in prev_quarter_transactions:
+            category = tx.category or "Uncategorized"
+            prev_quarter_categories[category] = prev_quarter_categories.get(
+                category, 0) + tx.amount
+
+        # Calculate quarter info
+        quarter_num = ((target_month.month - 1) // 3) + 1
+        quarter_name = f"Q{quarter_num} {target_month.year}"
+        prev_quarter_name = f"Q{quarter_num} {prev_year_target.year}"
+
+        # Calculate averages and trends
+        months_in_quarter = len(current_quarter_monthly)
+        monthly_average = current_quarter_total / max(months_in_quarter, 1)
+
+        # Year-over-year comparison
+        yoy_change = current_quarter_total - prev_quarter_total
+        yoy_change_pct = (yoy_change / abs(prev_quarter_total)
+                          ) * 100 if prev_quarter_total != 0 else 0
+
+        # Category comparisons
+        category_comparisons = {}
+        all_categories = set(current_quarter_categories.keys()) | set(
+            prev_quarter_categories.keys())
+
+        for category in all_categories:
+            current_amount = current_quarter_categories.get(category, 0)
+            prev_amount = prev_quarter_categories.get(category, 0)
+            change = current_amount - prev_amount
+            change_pct = (change / abs(prev_amount)) * \
+                100 if prev_amount != 0 else 0
+
+            category_comparisons[category] = {
+                "current": current_amount,
+                "previous": prev_amount,
+                "change": change,
+                "change_pct": change_pct
+            }
+
+        return {
+            "quarter_name": quarter_name,
+            "quarter_start": current_quarter_start,
+            "quarter_end": current_quarter_end,
+            "current_quarter": {
+                "total": current_quarter_total,
+                "transactions_count": len(current_quarter_transactions),
+                "categories": current_quarter_categories,
+                "monthly_breakdown": current_quarter_monthly,
+                "monthly_average": monthly_average,
+                "months_included": months_in_quarter
+            },
+            "previous_year_quarter": {
+                "name": prev_quarter_name,
+                "total": prev_quarter_total,
+                "transactions_count": len(prev_quarter_transactions),
+                "categories": prev_quarter_categories,
+                "start": prev_quarter_start,
+                "end": prev_quarter_end
+            },
+            "year_over_year": {
+                "change": yoy_change,
+                "change_pct": yoy_change_pct,
+                "category_comparisons": category_comparisons
+            }
+        }
+
+    def _get_yearly_data(self, target_month: Optional[date] = None) -> Dict[str, Any]:
+        """
+        Get comprehensive yearly data with trends and analysis.
+
+        Args:
+            target_month: Target month for the year
+
+        Returns:
+            Dictionary with yearly analysis data
+        """
+        if not target_month:
+            target_month = date.today()
+
+        # Get current year range
+        year_start, year_end = self._get_year_range(target_month)
+
+        # Get previous year for comparison
+        prev_year_start = year_start - relativedelta(years=1)
+        prev_year_end = year_end - relativedelta(years=1)
+
+        # Get transactions for both years
+        current_year_transactions = self.db.get_transactions(
+            year_start, year_end)
+        prev_year_transactions = self.db.get_transactions(
+            prev_year_start, prev_year_end)
+
+        # Calculate current year metrics
+        current_year_total = sum(tx.amount for tx in current_year_transactions)
+        current_year_categories = {}
+        monthly_breakdown = {}
+        quarterly_breakdown = {}
+
+        for tx in current_year_transactions:
+            # Category totals
+            category = tx.category or "Uncategorized"
+            current_year_categories[category] = current_year_categories.get(
+                category, 0) + tx.amount
+
+            # Monthly breakdown
+            month_key = tx.date.strftime("%Y-%m")
+            if month_key not in monthly_breakdown:
+                monthly_breakdown[month_key] = {
+                    "total": 0, "categories": {}, "count": 0}
+            monthly_breakdown[month_key]["total"] += tx.amount
+            monthly_breakdown[month_key]["count"] += 1
+            monthly_breakdown[month_key]["categories"][category] = \
+                monthly_breakdown[month_key]["categories"].get(
+                    category, 0) + tx.amount
+
+            # Quarterly breakdown
+            quarter = ((tx.date.month - 1) // 3) + 1
+            quarter_key = f"Q{quarter}"
+            if quarter_key not in quarterly_breakdown:
+                quarterly_breakdown[quarter_key] = {
+                    "total": 0, "categories": {}, "count": 0}
+            quarterly_breakdown[quarter_key]["total"] += tx.amount
+            quarterly_breakdown[quarter_key]["count"] += 1
+            quarterly_breakdown[quarter_key]["categories"][category] = \
+                quarterly_breakdown[quarter_key]["categories"].get(
+                    category, 0) + tx.amount
+
+        # Calculate previous year metrics
+        prev_year_total = sum(tx.amount for tx in prev_year_transactions)
+        prev_year_categories = {}
+
+        for tx in prev_year_transactions:
+            category = tx.category or "Uncategorized"
+            prev_year_categories[category] = prev_year_categories.get(
+                category, 0) + tx.amount
+
+        # Calculate trends and analysis
+        months_with_data = len(monthly_breakdown)
+        monthly_average = current_year_total / max(months_with_data, 1)
+
+        # Find highest and lowest spending months
+        highest_month = max(monthly_breakdown.items(
+        ), key=lambda x: x[1]["total"]) if monthly_breakdown else None
+        lowest_month = min(monthly_breakdown.items(
+        ), key=lambda x: x[1]["total"]) if monthly_breakdown else None
+
+        # Year-over-year comparison
+        yoy_change = current_year_total - prev_year_total
+        yoy_change_pct = (yoy_change / abs(prev_year_total)) * \
+            100 if prev_year_total != 0 else 0
+
+        # Category analysis
+        category_analysis = {}
+        all_categories = set(current_year_categories.keys()) | set(
+            prev_year_categories.keys())
+
+        for category in all_categories:
+            current_amount = current_year_categories.get(category, 0)
+            prev_amount = prev_year_categories.get(category, 0)
+            change = current_amount - prev_amount
+            change_pct = (change / abs(prev_amount)) * \
+                100 if prev_amount != 0 else 0
+
+            # Calculate percentage of total spending
+            current_pct_of_total = (
+                current_amount / abs(current_year_total)) * 100 if current_year_total != 0 else 0
+            prev_pct_of_total = (
+                prev_amount / abs(prev_year_total)) * 100 if prev_year_total != 0 else 0
+
+            category_analysis[category] = {
+                "current": current_amount,
+                "previous": prev_amount,
+                "change": change,
+                "change_pct": change_pct,
+                "current_pct_of_total": current_pct_of_total,
+                "prev_pct_of_total": prev_pct_of_total
+            }
+
+        # Calculate spending trends (month-over-month)
+        sorted_months = sorted(monthly_breakdown.keys())
+        spending_trend = []
+        for i in range(1, len(sorted_months)):
+            current_month_total = monthly_breakdown[sorted_months[i]]["total"]
+            prev_month_total = monthly_breakdown[sorted_months[i-1]]["total"]
+            mom_change = current_month_total - prev_month_total
+            mom_change_pct = (mom_change / abs(prev_month_total)
+                              ) * 100 if prev_month_total != 0 else 0
+
+            spending_trend.append({
+                "month": sorted_months[i],
+                "total": current_month_total,
+                "change": mom_change,
+                "change_pct": mom_change_pct
+            })
+
+        return {
+            "year": target_month.year,
+            "year_start": year_start,
+            "year_end": year_end,
+            "current_year": {
+                "total": current_year_total,
+                "transactions_count": len(current_year_transactions),
+                "categories": current_year_categories,
+                "monthly_breakdown": monthly_breakdown,
+                "quarterly_breakdown": quarterly_breakdown,
+                "monthly_average": monthly_average,
+                "months_with_data": months_with_data,
+                "highest_month": highest_month,
+                "lowest_month": lowest_month
+            },
+            "previous_year": {
+                "total": prev_year_total,
+                "transactions_count": len(prev_year_transactions),
+                "categories": prev_year_categories,
+                "year": prev_year_start.year
+            },
+            "year_over_year": {
+                "change": yoy_change,
+                "change_pct": yoy_change_pct,
+                "category_analysis": category_analysis
+            },
+            "trends": {
+                "spending_trend": spending_trend,
+                "quarterly_comparison": quarterly_breakdown
+            }
+        }
 
     def process_new_files(self) -> List[Transaction]:
         """
@@ -283,9 +678,11 @@ class BudgetAnalyzer:
         }
 
         # Add report-specific data
-        if report_type in ["quarterly", "yearly"]:
-            template_data.update(
-                self._get_comparative_data(target_month, report_type))
+        if report_type == "quarterly":
+            template_data["quarterly_data"] = self._get_quarterly_data(
+                target_month)
+        elif report_type == "yearly":
+            template_data["yearly_data"] = self._get_yearly_data(target_month)
 
         # Render template
         template_name = f"report_{report_type}.html"
@@ -295,39 +692,6 @@ class BudgetAnalyzer:
         except Exception as e:
             logger.error(f"Failed to render template {template_name}: {e}")
             return None
-
-    def _get_comparative_data(self, target_month: Optional[date], report_type: str) -> Dict[str, Any]:
-        """Get comparative data for quarterly and yearly reports."""
-        if not target_month:
-            target_month = date.today()
-
-        comparative_data = {}
-
-        if report_type == "quarterly":
-            # Get same quarter last year
-            last_year = target_month - relativedelta(years=1)
-            last_year_start, last_year_end = self._get_date_range(last_year)
-
-            last_year_transactions = self.db.get_transactions(
-                last_year_start, last_year_end)
-
-            comparative_data["last_year_same_quarter"] = {
-                "transactions": len(last_year_transactions),
-                "total_amount": sum(tx.amount for tx in last_year_transactions)
-            }
-
-        elif report_type == "yearly":
-            # Get year-to-date data
-            year_start = target_month.replace(month=1, day=1)
-            ytd_transactions = self.db.get_transactions(
-                year_start, target_month)
-
-            comparative_data["year_to_date"] = {
-                "transactions": len(ytd_transactions),
-                "total_amount": sum(tx.amount for tx in ytd_transactions)
-            }
-
-        return comparative_data
 
     def send_email_report(self, html_content: str, subject: str) -> bool:
         """Send email report with error handling."""
@@ -430,6 +794,8 @@ def main():
         "--target-month", help="Target month in YYYY-MM format")
     parser.add_argument("--force-import", action="store_true",
                         help="Force processing of files even if data exists")
+    parser.add_argument("--recategorize", action="store_true",
+                        help="Re-categorize transactions for the target month")
 
     args = parser.parse_args()
 
@@ -469,6 +835,31 @@ def main():
                     args.target_month, "%Y-%m").date()
             except ValueError:
                 logger.error("Invalid target month format. Use YYYY-MM")
+                return
+
+        # Handle re-categorization request
+        if args.recategorize:
+            logger.info("Re-categorizing transactions...")
+            recategorize_results = analyzer.recategorize_transactions(
+                target_month)
+
+            if recategorize_results["success"]:
+                logger.info(recategorize_results["message"])
+                print(f"Re-categorization completed:")
+                print(
+                    f"  - Transactions processed: {recategorize_results['transactions_processed']}")
+                print(
+                    f"  - Changes made: {recategorize_results['changes_made']}")
+                print(
+                    f"  - Period: {recategorize_results['start_date']} to {recategorize_results['end_date']}")
+            else:
+                logger.error(
+                    f"Re-categorization failed: {recategorize_results.get('error', 'Unknown error')}")
+                print(
+                    f"Re-categorization failed: {recategorize_results.get('message', 'Unknown error')}")
+
+            # Exit after re-categorization unless user wants to continue with report
+            if not input("Continue with report generation? (y/N): ").lower().startswith('y'):
                 return
 
         # Run analysis

@@ -82,9 +82,7 @@ class DatabaseManager:
                         if tx.category:
                             conn.execute('''
                                 UPDATE transactions
-                                SET category = ?,
-                                SET merchant = ?,
-                                updated_at = CURRENT_TIMESTAMP
+                                SET category = ?, merchant = ?, updated_at = CURRENT_TIMESTAMP
                                 WHERE transaction_id = ?
                             ''', (tx.category, tx.merchant, tx.transaction_id))
 
@@ -131,6 +129,25 @@ class DatabaseManager:
         except sqlite3.Error as e:
             logger.error(f"Failed to retrieve transactions: {e}")
             raise
+
+    def update_transactions(self, transactions: List[Transaction]) -> int:
+        """Update category and merchant for a list of transactions by transaction_id."""
+        updated_count = 0
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                for tx in transactions:
+                    result = conn.execute('''
+                        UPDATE transactions
+                        SET category = ?, merchant = ?, updated_at = CURRENT_TIMESTAMP
+                        WHERE transaction_id = ?
+                    ''', (tx.category, tx.merchant, tx.transaction_id))
+                    updated_count += result.rowcount
+                conn.commit()
+        except sqlite3.Error as e:
+            logger.error(f"Failed to update transactions: {e}")
+            raise
+        logger.info(f"Updated {updated_count} transactions in database")
+        return updated_count
 
     def cleanup_old_data(self, cutoff_date: date):
         """Remove data older than specified date."""
