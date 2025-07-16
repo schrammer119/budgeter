@@ -87,14 +87,18 @@ class BudgetAnalyzer:
         """Get date range for budget analysis (25th to 24th cycle)."""
         if target_month:
             # Use provided month
-            base_date = target_month.replace(day=1)
+            end_date = target_month.replace(day=24)
         else:
             # Use current month
-            base_date = date.today().replace(day=1)
+            base_date = date.today()
+            if base_date.day > 24:
+                end_date = base_date.replace(day=24)
+            else:
+                end_date = (base_date - relativedelta(months=1)
+                            ).replace(day=24)
 
         # Budget cycle runs from 25th of previous month to 24th of current month
-        start_date = (base_date - relativedelta(months=1)).replace(day=25)
-        end_date = base_date.replace(day=24)
+        start_date = (end_date - relativedelta(months=1)).replace(day=25)
 
         return start_date, end_date
 
@@ -112,27 +116,26 @@ class BudgetAnalyzer:
         quarter_start_month = ((quarter - 1) * 3) + 1
 
         # Get first day of quarter
-        quarter_start = base_date.replace(month=quarter_start_month, day=1)
-
-        # Get last day of quarter
-        if quarter == 4:
-            quarter_end = base_date.replace(month=12, day=31)
-        else:
-            next_quarter_start = base_date.replace(
-                month=quarter_start_month + 3, day=1)
-            quarter_end = next_quarter_start - timedelta(days=1)
+        quarter_start = (base_date.replace(
+            month=quarter_start_month, day=1) - timedelta(days=2)).replace(day=25)
+        quarter_end = (quarter_start + relativedelta(months=3)).replace(day=24)
 
         return quarter_start, quarter_end
 
     def _get_year_range(self, target_month: Optional[date] = None) -> Tuple[date, date]:
         """Get date range for year analysis."""
         if target_month:
-            base_date = target_month.replace(day=1)
+            year_end = target_month.replace(day=24)
         else:
-            base_date = date.today().replace(day=1)
+            # Use current month
+            base_date = date.today()
+            if base_date.day > 24:
+                year_end = base_date.replace(day=24)
+            else:
+                year_end = (base_date - relativedelta(months=1)
+                            ).replace(day=24)
 
-        year_start = base_date.replace(month=1, day=1)
-        year_end = base_date.replace(month=12, day=31)
+        year_start = (year_end - relativedelta(years=1)).replace(day=25)
 
         return year_start, year_end
 
@@ -291,6 +294,154 @@ class BudgetAnalyzer:
                 "changes_made": 0
             }
 
+    def _calculate_expense_volatility(self, monthly_expenses):
+        """Calculate expense volatility as coefficient of variation"""
+        if len(monthly_expenses) < 2:
+            return 0
+
+        mean_expense = sum(monthly_expenses) / len(monthly_expenses)
+        variance = sum((x - mean_expense) **
+                       2 for x in monthly_expenses) / len(monthly_expenses)
+        std_dev = variance ** 0.5
+
+        if mean_expense == 0:
+            return 0
+
+        coefficient_of_variation = (std_dev / mean_expense) * 100
+        return min(coefficient_of_variation, 100)
+
+    def _calculate_cash_flow_stability(self, monthly_cashflows, monthly_expenses):
+        """Calculate cash flow stability score (0-100)"""
+        if len(monthly_cashflows) < 2:
+            return 100
+
+        # Count positive cash flow months
+        positive_months = sum(1 for flow in monthly_cashflows if flow > 0)
+        consistency_score = (positive_months / len(monthly_cashflows)) * 100
+
+        # Calculate volatility penalty
+        volatility_penalty = self._calculate_expense_volatility(
+            monthly_expenses) * 0.5
+
+        return max(consistency_score - volatility_penalty, 0)
+
+    def _calculate_financial_health_score(self, savings_rate: float, debt_ratio: float, expense_volatility: float, cash_flow_stability: float) -> int:
+        """
+        Calculate a composite financial health score (0-100)
+
+        Factors:
+        - Savings rate (40% weight)
+        - Debt ratio (30% weight)
+        - Expense volatility (15% weight)
+        - Cash flow stability (15% weight)
+        """
+        savings_score = min(
+            savings_rate * 5, 100)  # 20% savings rate = 100 points
+        # 30% debt ratio = 0 points
+        debt_score = max(100 - (debt_ratio * 3.33), 0)
+        # Lower volatility = higher score
+        volatility_score = max(100 - expense_volatility, 0)
+        stability_score = cash_flow_stability  # 0-100 scale
+
+        weighted_score = (
+            savings_score * 0.4 +
+            debt_score * 0.3 +
+            volatility_score * 0.15 +
+            stability_score * 0.15
+        )
+
+        return int(weighted_score)
+
+    def _calculate_stability_score(self, monthly_income, monthly_expenses, monthly_cashflows,
+                                   yearly_income, yearly_expenses, yearly_net_flow) -> float:
+        """
+        Calculate a financial stability score (0-100) based on income/expense consistency,
+        cash flow predictability, and overall financial health.
+
+        Args:
+            monthly_income: List of 12 monthly income values
+            monthly_expenses: List of 12 monthly expense values
+            monthly_cashflows: List of 12 monthly net cash flows
+            yearly_income: Total yearly income
+            yearly_expenses: Total yearly expenses
+            yearly_net_flow: Total yearly net cash flow
+
+        Returns:
+            Float between 0-100 representing financial stability
+        """
+        import statistics
+
+        # Filter out zero months to avoid skewing calculations
+        non_zero_income = [x for x in monthly_income if x > 0]
+        non_zero_expenses = [x for x in monthly_expenses if x > 0]
+
+        if not non_zero_income or not non_zero_expenses:
+            return 0.0
+
+        # Component 1: Income Consistency (25% weight)
+        income_mean = statistics.mean(non_zero_income)
+        income_stdev = statistics.stdev(
+            non_zero_income) if len(non_zero_income) > 1 else 0
+        income_cv = (income_stdev / income_mean) if income_mean > 0 else 1
+        income_consistency = max(0, 100 - (income_cv * 100))
+
+        # Component 2: Expense Predictability (25% weight)
+        expense_mean = statistics.mean(non_zero_expenses)
+        expense_stdev = statistics.stdev(
+            non_zero_expenses) if len(non_zero_expenses) > 1 else 0
+        expense_cv = (expense_stdev / expense_mean) if expense_mean > 0 else 1
+        expense_predictability = max(0, 100 - (expense_cv * 100))
+
+        # Component 3: Cash Flow Stability (30% weight)
+        negative_months = sum(1 for cf in monthly_cashflows if cf < 0)
+        positive_flow_ratio = max(0, (12 - negative_months) / 12 * 100)
+
+        # Cash flow variance penalty
+        cf_variance = statistics.variance(
+            monthly_cashflows) if len(monthly_cashflows) > 1 else 0
+        # Scale variance appropriately
+        cf_volatility_penalty = min(50, cf_variance / 10000)
+        cash_flow_stability = max(
+            0, positive_flow_ratio - cf_volatility_penalty)
+
+        # Component 4: Overall Financial Health (20% weight)
+        # Savings rate and debt management
+        savings_rate = (yearly_net_flow / yearly_income *
+                        100) if yearly_income > 0 else -100
+
+        if savings_rate >= 20:
+            health_score = 100
+        elif savings_rate >= 10:
+            health_score = 80
+        elif savings_rate >= 5:
+            health_score = 60
+        elif savings_rate >= 0:
+            health_score = 40
+        elif savings_rate >= -10:
+            health_score = 20
+        else:
+            health_score = 0
+
+        # Calculate weighted final score
+        stability_score = (
+            income_consistency * 0.25 +
+            expense_predictability * 0.25 +
+            cash_flow_stability * 0.30 +
+            health_score * 0.20
+        )
+
+        return round(stability_score, 0)
+
+    def _get_month_index(self, date: date, start_date: date) -> int:
+
+        month = date.month
+        if date.day > 24:
+            month = (month + 1) % 12
+
+        index = (month - (start_date.month + 1)) % 12
+
+        return index
+
     def _get_monthly_data(self,
                           transactions: List[Transaction],
                           target_month: date,
@@ -433,64 +584,6 @@ class BudgetAnalyzer:
 
         return monthly_data
 
-    def _calculate_expense_volatility(self, monthly_expenses):
-        """Calculate expense volatility as coefficient of variation"""
-        if len(monthly_expenses) < 2:
-            return 0
-
-        mean_expense = sum(monthly_expenses) / len(monthly_expenses)
-        variance = sum((x - mean_expense) **
-                       2 for x in monthly_expenses) / len(monthly_expenses)
-        std_dev = variance ** 0.5
-
-        if mean_expense == 0:
-            return 0
-
-        coefficient_of_variation = (std_dev / mean_expense) * 100
-        return min(coefficient_of_variation, 100)
-
-    def _calculate_cash_flow_stability(self, monthly_cashflows, monthly_expenses):
-        """Calculate cash flow stability score (0-100)"""
-        if len(monthly_cashflows) < 2:
-            return 100
-
-        # Count positive cash flow months
-        positive_months = sum(1 for flow in monthly_cashflows if flow > 0)
-        consistency_score = (positive_months / len(monthly_cashflows)) * 100
-
-        # Calculate volatility penalty
-        volatility_penalty = self._calculate_expense_volatility(
-            monthly_expenses) * 0.5
-
-        return max(consistency_score - volatility_penalty, 0)
-
-    def _calculate_financial_health_score(self, savings_rate: float, debt_ratio: float, expense_volatility: float, cash_flow_stability: float) -> int:
-        """
-        Calculate a composite financial health score (0-100)
-
-        Factors:
-        - Savings rate (40% weight)
-        - Debt ratio (30% weight)
-        - Expense volatility (15% weight)
-        - Cash flow stability (15% weight)
-        """
-        savings_score = min(
-            savings_rate * 5, 100)  # 20% savings rate = 100 points
-        # 30% debt ratio = 0 points
-        debt_score = max(100 - (debt_ratio * 3.33), 0)
-        # Lower volatility = higher score
-        volatility_score = max(100 - expense_volatility, 0)
-        stability_score = cash_flow_stability  # 0-100 scale
-
-        weighted_score = (
-            savings_score * 0.4 +
-            debt_score * 0.3 +
-            volatility_score * 0.15 +
-            stability_score * 0.15
-        )
-
-        return int(weighted_score)
-
     def _get_quarterly_data(self, target_month: Optional[date] = None) -> Dict[str, Any]:
         """
         Get comprehensive quarterly data including current quarter and previous year comparison.
@@ -518,16 +611,23 @@ class BudgetAnalyzer:
         current_quarter_start, current_quarter_end = self._get_quarter_range(
             target_month)
 
+        # Get previous quarter range
+        prev_quarter_target = target_month - relativedelta(months=3)
+        prev_quarter_start, prev_qaurter_end = self._get_quarter_range(
+            prev_quarter_target)
+
         # Get previous year same quarter
         prev_year_target = target_month - relativedelta(years=1)
-        prev_quarter_start, prev_quarter_end = self._get_quarter_range(
+        prev_year_start, prev_year_end = self._get_quarter_range(
             prev_year_target)
 
         # Get transactions for both periods
         current_quarter_transactions = self.db.get_transactions(
             current_quarter_start, current_quarter_end)
         prev_quarter_transactions = self.db.get_transactions(
-            prev_quarter_start, prev_quarter_end)
+            prev_quarter_start, prev_qaurter_end)
+        prev_year_transactions = self.db.get_transactions(
+            prev_year_start, prev_year_end)
 
         # quarterly totals
         quarterly_income = 0.0
@@ -545,37 +645,31 @@ class BudgetAnalyzer:
         for tx in current_quarter_transactions:
             amount = tx.amount
             category = tx.category or 'Uncategorized'
+            month_index = self._get_month_index(tx.date, current_quarter_start)
 
             # Positive amounts are income, negative are expenses
             if category == 'Income' or category == 'Uncategorized Income':
                 quarterly_income += amount
-                monthly_income[tx.date.month -
-                               current_quarter_start.month] += amount
+                monthly_income[month_index] += amount
 
             else:
                 # Convert to positive for expense tracking
                 expense_amount = -amount
                 quarterly_expenses += expense_amount
-                monthly_expenses[tx.date.month -
-                                 current_quarter_start.month] += expense_amount
+                monthly_expenses[month_index] += expense_amount
 
                 category_type = CATEGORY_TYPES.get(category, 'Unkown')
                 if category_type == 'Discretionary':
-                    monthly_discretionary[tx.date.month -
-                                          current_quarter_start.month] += expense_amount
+                    monthly_discretionary[month_index] += expense_amount
                 elif category_type == 'Non-Discretionary':
-                    monthly_non_discretionary[tx.date.month -
-                                              current_quarter_start.month] += expense_amount
+                    monthly_non_discretionary[month_index] += expense_amount
                 elif category_type == 'Debt':
-                    monthly_debt[tx.date.month -
-                                 current_quarter_start.month] += expense_amount
+                    monthly_debt[month_index] += expense_amount
                 elif category_type == 'Savings':
-                    monthly_savings[tx.date.month -
-                                    current_quarter_start.month] += expense_amount
+                    monthly_savings[month_index] += expense_amount
 
                 category_totals[category] += expense_amount
-                monthly_categories[tx.date.month -
-                                   current_quarter_start.month][category] += expense_amount
+                monthly_categories[month_index][category] += expense_amount
 
         # Calculate financial metrics
         quarterly_net_flow = quarterly_income - quarterly_expenses
@@ -603,7 +697,6 @@ class BudgetAnalyzer:
             else:
                 q_unknown_spending += amount
 
-        quarterly_net_flow = quarterly_income - quarterly_expenses
         quarterly_discretionary_pct = (
             quarterly_discretionary / quarterly_income * 100) if quarterly_income > 0 else 0
         quarterly_non_discretionary_pct = (
@@ -620,22 +713,21 @@ class BudgetAnalyzer:
         prev_monthly_expenses = [0.0, 0.0, 0.0]
         prev_category_totals = defaultdict(float)
 
-        for tx in prev_quarter_transactions:
+        for tx in prev_year_transactions:
             amount = tx.amount
             category = tx.category or 'Uncategorized'
+            month_index = self._get_month_index(tx.date, current_quarter_start)
 
             # Positive amounts are income, negative are expenses
             if category == 'Income' or category == 'Uncategorized Income':
                 prev_quarterly_income += amount
-                prev_monthly_income[tx.date.month -
-                                    prev_quarter_start.month] += amount
+                prev_monthly_income[month_index] += amount
 
             else:
                 # Convert to positive for expense tracking
                 expense_amount = -amount
                 prev_quarterly_expenses += expense_amount
-                prev_monthly_expenses[tx.date.month -
-                                      prev_quarter_start.month] += expense_amount
+                prev_monthly_expenses[month_index] += expense_amount
                 prev_category_totals[category] += expense_amount
 
         # Calculate financial metrics
@@ -772,19 +864,61 @@ class BudgetAnalyzer:
             'expenses': quarterly_expenses,
             'net_flow': quarterly_net_flow,
             'discretionary': quarterly_discretionary,
-            'discretionary': quarterly_non_discretionary,
-            'savings': quarterly_debt,
+            'non-discretionary': quarterly_non_discretionary,
+            'debt': quarterly_debt,
             'savings': quarterly_savings,
         }
 
+        prevq_quarterly_income = 0.0
+        prevq_quarterly_expenses = 0.0
+        prevq_category_totals = defaultdict(float)
+
+        for tx in prev_quarter_transactions:
+            amount = tx.amount
+            category = tx.category or 'Uncategorized'
+
+            # Positive amounts are income, negative are expenses
+            if category == 'Income' or category == 'Uncategorized Income':
+                prevq_quarterly_income += amount
+
+            else:
+                # Convert to positive for expense tracking
+                expense_amount = -amount
+                prevq_quarterly_expenses += expense_amount
+                prevq_category_totals[category] += expense_amount
+
+        # Calculate financial metrics
+        prevq_quarterly_net_flow = prevq_quarterly_income - prevq_quarterly_expenses
+
+        # Calculate spending by type
+        prevq_quarterly_discretionary = 0.0
+        prevq_quarterly_non_discretionary = 0.0
+        prevq_quarterly_debt = 0.0
+        prevq_quarterly_savings = 0.0
+        prevq_q_unknown_spending = 0.0
+
+        for category, amount in prevq_category_totals.items():
+            category_type = CATEGORY_TYPES.get(
+                category, 'Unkown')
+            if category_type == 'Discretionary':
+                prevq_quarterly_discretionary += amount
+            elif category_type == 'Non-Discretionary':
+                prevq_quarterly_non_discretionary += amount
+            elif category_type == 'Debt':
+                prevq_quarterly_debt += amount
+            elif category_type == 'Savings':
+                prevq_quarterly_savings += amount
+            else:
+                prevq_q_unknown_spending += amount
+
         previous_quarter = {
-            'income': prev_quarterly_income,
-            'expenses': prev_quarterly_expenses,
-            'net_flow': prev_quarterly_net_flow,
-            'discretionary': prev_quarterly_discretionary,
-            'discretionary': prev_quarterly_non_discretionary,
-            'savings': prev_quarterly_debt,
-            'savings': prev_quarterly_savings,
+            'income': prevq_quarterly_income,
+            'expenses': prevq_quarterly_expenses,
+            'net_flow': prevq_quarterly_net_flow,
+            'discretionary': prevq_quarterly_discretionary,
+            'non-discretionary': prevq_quarterly_non_discretionary,
+            'debt': prevq_quarterly_debt,
+            'savings': prevq_quarterly_savings,
         }
 
         qoq_comparison = []
@@ -826,13 +960,6 @@ class BudgetAnalyzer:
                          quarterly_discretionary) / prev_quarterly_discretionary) * 100
             achievements.append(
                 f"Reduced discretionary spending by {reduction:.1f}% compared to last year")
-
-        # Check for debt reduction
-        if quarterly_debt > prev_quarterly_debt:
-            increase = ((quarterly_debt - prev_quarterly_debt) /
-                        prev_quarterly_debt) * 100 if prev_quarterly_debt > 0 else 0
-            achievements.append(
-                f"Increased debt payments by {increase:.1f}% compared to last year")
 
         quarterly_achievements = achievements if achievements else [
             "Completed financial tracking for the quarter"]
@@ -902,28 +1029,6 @@ class BudgetAnalyzer:
 
         quarterly_recommendations = recommendations if recommendations else [
             "Continue monitoring spending patterns and maintain current financial discipline"]
-
-        # projections
-        if quarter_num == 1:
-            projected_annual_income = quarterly_income * 4
-        elif quarter_num == 2:
-            projected_annual_income = quarterly_income * 2  # Based on H1 performance
-        elif quarter_num == 3:
-            projected_annual_income = quarterly_income * 4/3  # Based on 9-month performance
-        else:
-            projected_annual_income = quarterly_income
-
-        seasonal_multipliers = {
-            1: 1.0,  # Q1 baseline
-            2: 1.0,  # Q2 similar to Q1
-            3: 1.0,  # Q3 similar
-            4: 1.1   # Q4 higher due to holidays
-        }
-
-        base_projection = quarterly_expenses * 4
-        seasonal_adjustment = seasonal_multipliers.get(quarter_num, 1.0)
-
-        projected_annual_expenses = base_projection * seasonal_adjustment
 
         return {
             # Basic info
@@ -997,10 +1102,6 @@ class BudgetAnalyzer:
             'quarterly_achievements': quarterly_achievements,
             'quarterly_concerns': quarterly_concerns,
             'quarterly_recommendations': quarterly_recommendations,
-
-            # Projections
-            'projected_annual_income': projected_annual_income,
-            'projected_annual_expenses': projected_annual_expenses,
         }
 
     def _get_yearly_data(self, target_month: Optional[date] = None) -> Dict[str, Any]:
@@ -1020,8 +1121,8 @@ class BudgetAnalyzer:
         year_start, year_end = self._get_year_range(target_month)
 
         # Get previous year for comparison
-        prev_year_start = year_start - relativedelta(years=1)
-        prev_year_end = year_end - relativedelta(years=1)
+        prev_year_start = (year_start - relativedelta(years=1)).replace(day=25)
+        prev_year_end = (year_end - relativedelta(years=1)).replace(day=24)
 
         # Get transactions for both years
         current_year_transactions = self.db.get_transactions(
@@ -1029,139 +1130,295 @@ class BudgetAnalyzer:
         prev_year_transactions = self.db.get_transactions(
             prev_year_start, prev_year_end)
 
-        # Calculate current year metrics
-        current_year_total = sum(tx.amount for tx in current_year_transactions)
-        current_year_categories = {}
-        monthly_breakdown = {}
-        quarterly_breakdown = {}
+        # metrics
+        yearly_income = 0.0
+        yearly_expenses = 0.0
+        monthly_income = [0.0] * 12
+        monthly_expenses = [0.0] * 12
+        monthly_savings = [0.0] * 12
+        monthly_discretionary = [0.0] * 12
+        monthly_non_discretionary = [0.0] * 12
+        monthly_debt = [0.0] * 12
+        category_totals = defaultdict(float)
+        income_sources = defaultdict(float)
+        monthly_categories = defaultdict(lambda: [0.0] * 12)
 
         for tx in current_year_transactions:
-            # Category totals
-            category = tx.category or "Uncategorized"
-            current_year_categories[category] = current_year_categories.get(
-                category, 0) + tx.amount
+            amount = tx.amount
+            category = tx.category or 'Uncategorized'
+            merchant = tx.merchant or tx.description
+            month_index = self._get_month_index(tx.date, year_start)
 
-            # Monthly breakdown
-            month_key = tx.date.strftime("%Y-%m")
-            if month_key not in monthly_breakdown:
-                monthly_breakdown[month_key] = {
-                    "total": 0, "categories": {}, "count": 0}
-            monthly_breakdown[month_key]["total"] += tx.amount
-            monthly_breakdown[month_key]["count"] += 1
-            monthly_breakdown[month_key]["categories"][category] = \
-                monthly_breakdown[month_key]["categories"].get(
-                    category, 0) + tx.amount
+            # Positive amounts are income, negative are expenses
+            if category == 'Income' or category == 'Uncategorized Income':
+                yearly_income += amount
+                monthly_income[month_index] += amount
+                # Group income by category or merchant
+                income_sources[merchant] += amount
 
-            # Quarterly breakdown
-            quarter = ((tx.date.month - 1) // 3) + 1
-            quarter_key = f"Q{quarter}"
-            if quarter_key not in quarterly_breakdown:
-                quarterly_breakdown[quarter_key] = {
-                    "total": 0, "categories": {}, "count": 0}
-            quarterly_breakdown[quarter_key]["total"] += tx.amount
-            quarterly_breakdown[quarter_key]["count"] += 1
-            quarterly_breakdown[quarter_key]["categories"][category] = \
-                quarterly_breakdown[quarter_key]["categories"].get(
-                    category, 0) + tx.amount
+            else:
+                # Convert to positive for expense tracking
+                expense_amount = -amount
+                yearly_expenses += expense_amount
+                monthly_expenses[month_index] += expense_amount
 
-        # Calculate previous year metrics
-        prev_year_total = sum(tx.amount for tx in prev_year_transactions)
-        prev_year_categories = {}
+                category_type = CATEGORY_TYPES.get(category, 'Unkown')
+                if category_type == 'Discretionary':
+                    monthly_discretionary[month_index] += expense_amount
+                elif category_type == 'Non-Discretionary':
+                    monthly_non_discretionary[month_index] += expense_amount
+                elif category_type == 'Debt':
+                    monthly_debt[month_index] += expense_amount
+                elif category_type == 'Savings':
+                    monthly_savings[month_index] += expense_amount
+
+                category_totals[category] += expense_amount
+                monthly_categories[category][month_index] += expense_amount
+
+        # Calculate financial metrics
+        yearly_net_flow = yearly_income - yearly_expenses
+        yearly_avg_daily = yearly_expenses / (year_end - year_start).days
+        monthly_cashflows = [i - e for i,
+                             e in zip(monthly_income, monthly_expenses)]
+
+        # Calculate spending by type
+        yearly_discretionary = 0.0
+        yearly_non_discretionary = 0.0
+        yearly_debt = 0.0
+        yearly_savings = 0.0
+        y_unknown_spending = 0.0
+
+        for category, amount in category_totals.items():
+            category_type = CATEGORY_TYPES.get(
+                category, 'Unkown')
+            if category_type == 'Discretionary':
+                yearly_discretionary += amount
+            elif category_type == 'Non-Discretionary':
+                yearly_non_discretionary += amount
+            elif category_type == 'Debt':
+                yearly_debt += amount
+            elif category_type == 'Savings':
+                yearly_savings += amount
+            else:
+                y_unknown_spending += amount
+
+        yearly_discretionary_pct = (
+            yearly_discretionary / yearly_income * 100) if yearly_income > 0 else 0
+        yearly_non_discretionary_pct = (
+            yearly_non_discretionary / yearly_income * 100) if yearly_income > 0 else 0
+        yearly_debt_pct = (yearly_debt / yearly_income *
+                           100) if yearly_income > 0 else 0
+        yearly_savings_pct = (yearly_savings / yearly_income *
+                              100) if yearly_income > 0 else 0
+
+        # prev year metrics
+        prev_yearly_income = 0.0
+        prev_yearly_expenses = 0.0
+        prev_category_totals = defaultdict(float)
 
         for tx in prev_year_transactions:
-            category = tx.category or "Uncategorized"
-            prev_year_categories[category] = prev_year_categories.get(
-                category, 0) + tx.amount
+            amount = tx.amount
+            category = tx.category or 'Uncategorized'
 
-        # Calculate trends and analysis
-        months_with_data = len(monthly_breakdown)
-        monthly_average = current_year_total / max(months_with_data, 1)
+            # Positive amounts are income, negative are expenses
+            if category == 'Income' or category == 'Uncategorized Income':
+                prev_yearly_income += amount
+            else:
+                # Convert to positive for expense tracking
+                expense_amount = -amount
+                prev_yearly_expenses += expense_amount
 
-        # Find highest and lowest spending months
-        highest_month = max(monthly_breakdown.items(
-        ), key=lambda x: x[1]["total"]) if monthly_breakdown else None
-        lowest_month = min(monthly_breakdown.items(
-        ), key=lambda x: x[1]["total"]) if monthly_breakdown else None
+                prev_category_totals[category] += expense_amount
 
-        # Year-over-year comparison
-        yoy_change = current_year_total - prev_year_total
-        yoy_change_pct = (yoy_change / abs(prev_year_total)) * \
-            100 if prev_year_total != 0 else 0
+        # Calculate financial metrics
+        prev_yearly_net_flow = prev_yearly_income - prev_yearly_expenses
+        prev_yearly_avg_daily = prev_yearly_expenses / \
+            (prev_year_end - prev_year_start).days
 
-        # Category analysis
-        category_analysis = {}
-        all_categories = set(current_year_categories.keys()) | set(
-            prev_year_categories.keys())
+        # Calculate spending by type
+        prev_yearly_discretionary = 0.0
+        prev_yearly_non_discretionary = 0.0
+        prev_yearly_debt = 0.0
+        prev_yearly_savings = 0.0
+        prev_y_unknown_spending = 0.0
 
-        for category in all_categories:
-            current_amount = current_year_categories.get(category, 0)
-            prev_amount = prev_year_categories.get(category, 0)
-            change = current_amount - prev_amount
-            change_pct = (change / abs(prev_amount)) * \
-                100 if prev_amount != 0 else 0
+        for category, amount in prev_category_totals.items():
+            category_type = CATEGORY_TYPES.get(
+                category, 'Unkown')
+            if category_type == 'Discretionary':
+                prev_yearly_discretionary += amount
+            elif category_type == 'Non-Discretionary':
+                prev_yearly_non_discretionary += amount
+            elif category_type == 'Debt':
+                prev_yearly_debt += amount
+            elif category_type == 'Savings':
+                prev_yearly_savings += amount
+            else:
+                prev_y_unknown_spending += amount
 
-            # Calculate percentage of total spending
-            current_pct_of_total = (
-                current_amount / abs(current_year_total)) * 100 if current_year_total != 0 else 0
-            prev_pct_of_total = (
-                prev_amount / abs(prev_year_total)) * 100 if prev_year_total != 0 else 0
+        # YOY
+        yoy_income_growth = (yearly_income - prev_yearly_income) / \
+            prev_yearly_income if prev_yearly_income > 0 else 0
+        yoy_expenses_growth = (yearly_expenses - prev_yearly_expenses) / \
+            prev_yearly_expenses if prev_yearly_expenses > 0 else 0
+        yoy_net_flow_growth = (yearly_net_flow - prev_yearly_net_flow) / \
+            prev_yearly_net_flow if prev_yearly_net_flow > 0 else 0
+        yoy_daily_growth = (yearly_avg_daily - prev_yearly_avg_daily) / \
+            prev_yearly_avg_daily if prev_yearly_avg_daily > 0 else 0
 
-            category_analysis[category] = {
-                "current": current_amount,
-                "previous": prev_amount,
-                "change": change,
-                "change_pct": change_pct,
-                "current_pct_of_total": current_pct_of_total,
-                "prev_pct_of_total": prev_pct_of_total
-            }
+        current_year = {
+            'income': yearly_income,
+            'expenses': yearly_expenses,
+            'net_flow': yearly_net_flow,
+            'daily_spending': yearly_avg_daily,
+            'discretionary': yearly_discretionary,
+            'non-discretionary': yearly_non_discretionary,
+            'debt': yearly_debt,
+            'savings': yearly_savings,
+        }
 
-        # Calculate spending trends (month-over-month)
-        sorted_months = sorted(monthly_breakdown.keys())
-        spending_trend = []
-        for i in range(1, len(sorted_months)):
-            current_month_total = monthly_breakdown[sorted_months[i]]["total"]
-            prev_month_total = monthly_breakdown[sorted_months[i-1]]["total"]
-            mom_change = current_month_total - prev_month_total
-            mom_change_pct = (mom_change / abs(prev_month_total)
-                              ) * 100 if prev_month_total != 0 else 0
+        prev_year = {
+            'income': prev_yearly_income,
+            'expenses': prev_yearly_expenses,
+            'net_flow': prev_yearly_net_flow,
+            'daily_spending': prev_yearly_avg_daily,
+            'discretionary': prev_yearly_discretionary,
+            'non-discretionary': prev_yearly_non_discretionary,
+            'debt': prev_yearly_debt,
+            'savings': prev_yearly_savings,
+        }
 
-            spending_trend.append({
-                "month": sorted_months[i],
-                "total": current_month_total,
-                "change": mom_change,
-                "change_pct": mom_change_pct
+        category_yoy_analysis = []
+        for metric, current_value in current_year.items():
+            previous_value = prev_year.get(metric, 0)
+            change = current_value - previous_value
+            percentage_change = (
+                current_value / previous_value * 100 - 100) if previous_value > 0 else 0
+
+            if previous_value == 0:
+                trend = "New" if current_value > 0 else "No Data"
+            elif percentage_change > 10:
+                trend = "Strong Growth"
+            elif percentage_change > 5:
+                trend = "Growth"
+            elif percentage_change < -10:
+                trend = "Declining"
+            elif percentage_change < -5:
+                trend = "Slight Decline"
+            else:
+                trend = "Stable"
+
+            category_yoy_analysis.append({
+                'name': metric.replace('_', ' ').title(),
+                'current_year': current_value,
+                'previous_year': previous_value,
+                'change': change,
+                'percentage_change': percentage_change,
+                'trend': trend
             })
 
+        # months
+        monthly_labels = []
+        current = date(year_start.year, year_start.month +
+                       1, 1)  # normalize to first of month
+        while current <= year_end:
+            monthly_labels.append(current.strftime(
+                '%b %Y'))  # e.g., 'Jan 2025'
+            current += relativedelta(months=1)
+
+        best_month_flow = max(monthly_cashflows)
+        best_month = monthly_labels[monthly_cashflows.index(best_month_flow)]
+        peak_income_amount = max(monthly_income)
+        peak_income_month = monthly_labels[monthly_income.index(
+            peak_income_amount)]
+        highest_expense_amount = max(monthly_expenses)
+        highest_expense_month = monthly_labels[monthly_expenses.index(
+            highest_expense_amount)]
+
+        monthly_discretionary_pct = [
+            a / b * 100 if b > 0 else 0 for a, b in zip(monthly_discretionary, monthly_income)]
+        monthly_non_discretionary_pct = [
+            a / b * 100 if b > 0 else 0 for a, b in zip(monthly_non_discretionary, monthly_income)]
+        monthly_savings_pct = [
+            a / b * 100 if b > 0 else 0 for a, b in zip(monthly_savings, monthly_income)]
+        monthly_debt_pct = [a / b * 100 if b > 0 else 0 for a,
+                            b in zip(monthly_debt, monthly_income)]
+
+        color_palette = ["#f59e0b", "#3b82f6",
+                         "#10b981", "#dc2626", "#7c3aed", "#a855f7"]
+        bg_pallete = ['rgba(245, 158, 11, 0.1)',
+                      'rgba(59, 130, 246, 0.1)',
+                      'rgba(16, 185, 129, 0.1)',
+                      'rgba(220, 38, 38, 0.1)',
+                      'rgba(124, 58, 237, 0.1)',
+                      'rgba(168, 85, 247, 0.1)']
+        category_trends_datasets = [{'label': cat,
+                                     'data': data,
+                                     'borderColor': color_palette[i % len(color_palette)],
+                                     'backgroundColor': bg_pallete[i % len(bg_pallete)],
+                                     'fill': True,
+                                     'tension': 0.4}
+                                    for i, (cat, data) in enumerate(monthly_categories.items())]
+
+        monthly_summary = [dict(zip(['month', 'income', 'expenses', 'net_flow', 'discretionary_pct', 'non_discretionary_pct', 'savings_rate', 'debt_rate'], v))
+                           for v in zip(monthly_labels, monthly_income, monthly_expenses, monthly_cashflows, monthly_discretionary_pct, monthly_non_discretionary_pct, monthly_savings_pct, monthly_debt_pct)]
+
+        # stability score
+        stability_score = self._calculate_stability_score(monthly_income,
+                                                          monthly_expenses,
+                                                          monthly_cashflows,
+                                                          yearly_income,
+                                                          yearly_expenses,
+                                                          yearly_net_flow)
+
         return {
-            "year": target_month.year,
-            "year_start": year_start,
-            "year_end": year_end,
-            "current_year": {
-                "total": current_year_total,
-                "transactions_count": len(current_year_transactions),
-                "categories": current_year_categories,
-                "monthly_breakdown": monthly_breakdown,
-                "quarterly_breakdown": quarterly_breakdown,
-                "monthly_average": monthly_average,
-                "months_with_data": months_with_data,
-                "highest_month": highest_month,
-                "lowest_month": lowest_month
-            },
-            "previous_year": {
-                "total": prev_year_total,
-                "transactions_count": len(prev_year_transactions),
-                "categories": prev_year_categories,
-                "year": prev_year_start.year
-            },
-            "year_over_year": {
-                "change": yoy_change,
-                "change_pct": yoy_change_pct,
-                "category_analysis": category_analysis
-            },
-            "trends": {
-                "spending_trend": spending_trend,
-                "quarterly_comparison": quarterly_breakdown
-            }
+            # metrics
+            'yearly_income': yearly_income,
+            'yearly_expenses': yearly_expenses,
+            'yearly_net_flow': yearly_net_flow,
+            'yearly_avg_daily': yearly_avg_daily,
+            'yearly_discretionary': yearly_discretionary,
+            'yearly_non_discretionary': yearly_non_discretionary,
+            'yearly_savings': yearly_savings,
+            'yearly_debt': yearly_debt,
+            # rates
+            'yearly_discretionary_pct': yearly_discretionary_pct,
+            'yearly_non_discretionary_pct': yearly_non_discretionary_pct,
+            'yearly_savings_pct': yearly_savings_pct,
+            'yearly_debt_pct': yearly_debt_pct,
+            # yoy
+            'yoy_income_growth': yoy_income_growth,
+            'yoy_expenses_growth': yoy_expenses_growth,
+            'yoy_net_flow_growth': yoy_net_flow_growth,
+            'yoy_daily_growth': yoy_daily_growth,
+            'category_yoy_analysis': category_yoy_analysis,
+            # months
+            'best_month': best_month,
+            'best_month_flow': best_month_flow,
+            'peak_income_month': peak_income_month,
+            'peak_income_amount': peak_income_amount,
+            'highest_expense_month': highest_expense_month,
+            'highest_expense_amount': highest_expense_amount,
+            # summary charts
+            'yearly_income_labels': list(income_sources.keys()),
+            'yearly_income_amounts': list(income_sources.values()),
+            'yearly_category_labels': list(category_totals.keys()),
+            # list()
+            'yearly_category_amounts': list(category_totals.values()),
+            # progression charts
+            'monthly_labels': monthly_labels,
+            'monthly_income_progression': monthly_income,
+            'monthly_expenses_progression': monthly_expenses,
+            'monthly_net_flow_progression': monthly_cashflows,
+            'monthly_discretionary_pct': monthly_discretionary_pct,
+            'monthly_non_discretionary_pct': monthly_non_discretionary_pct,
+            'monthly_savings_pct': monthly_savings_pct,
+            'monthly_debt_pct': monthly_debt_pct,
+            'category_trends_datasets': category_trends_datasets,
+            # tables
+            'monthly_summary': monthly_summary,
+            # score
+            'stability_score': stability_score,
         }
 
     def process_new_files(self) -> List[Transaction]:
@@ -1267,7 +1524,7 @@ class BudgetAnalyzer:
             template_data.update(yearly_data)
 
         # Render template
-        template_name = f"report_monthly.html"
+        template_name = f"report_template.html"
         try:
             template = self.jinja_env.get_template(template_name)
             return template.render(**template_data)
@@ -1282,7 +1539,7 @@ class BudgetAnalyzer:
             msg = MIMEMultipart("alternative")
             msg["Subject"] = subject
             msg["From"] = self.cfg.credentials.email_from
-            msg["To"] = self.cfg.credentials.email_to
+            msg["To"] = self.cfg.credentials.email_from
 
             html_part = MIMEText(html_content, "html", "utf-8")
             msg.attach(html_part)
@@ -1291,7 +1548,8 @@ class BudgetAnalyzer:
                 server.starttls()
                 server.login(self.cfg.credentials.smtp_user,
                              self.cfg.credentials.smtp_password)
-                server.send_message(msg)
+                server.send_message(
+                    msg, to_addrs=self.cfg.credentials.email_from)
 
             logger.info("Email report sent successfully")
             return True

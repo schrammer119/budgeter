@@ -11,7 +11,8 @@
             "program": "${file}",
             "console": "integratedTerminal",
             "args": [
-                "--no-email",
+                "--report-type",
+                "yearly",
                 "--target-month",
                 "2025-06",
                 "--force-import",
