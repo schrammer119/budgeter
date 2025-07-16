@@ -62,38 +62,6 @@ class GeneralConfig:
     processed_dir: str = "processed"
 
     # Categorization
-    merchant_categories: Dict[str, str] = field(default_factory=lambda: {
-        "espresso house":           "Coffee & Bakery",
-        "ica maxi":                 "Groceries",
-        "coop":                     "Groceries",
-        "hemköp":                   "Groceries",
-        "trattoria bonasera":       "Dining Out",
-        "systembolaget":            "Alcohol & Spirits",
-        "apoteket":                 "Pharmacy & Health",
-        "fahlmans konditori":       "Coffee & Bakery",
-        "subway":                   "Dining Out",
-        "mcdonalds":                "Dining Out",
-        "preem":                    "Fuel & Gas",
-        "shell":                    "Fuel & Gas",
-        "circle k":                 "Fuel & Gas",
-        "öresundkraft":             "Utilities",
-        "spotify":                  "Subscriptions",
-        "disney plus":              "Subscriptions",
-        "amazon":                   "Shopping",
-        "ebay":                     "Shopping",
-        "ikea":                     "Shopping",
-        "rikshem":                  "Housing & Rent",
-        "ownit":                    "Financial Services",
-        "klarna":                   "Financial Services",
-        "lön":                      "Income",
-        "fkassa":                   "Income",
-        "biljettköp":               "Travel & Tickets",
-        "ryanair":                  "Travel & Tickets",
-        "taxi":                     "Transport",
-        "voi":                      "Transport",
-        "tier":                     "Transport",
-    })
-    merchant_keys: List[str] = field(default_factory=lambda: list)
     category_threshold: int = 75
 
     # Reporting
@@ -113,13 +81,11 @@ class GeneralConfig:
     log_level: str = "INFO"
     log_file: str = LOG_FILE_PATH
 
-    def __post_init__(self):
-        self.merchant_keys = list(self.merchant_categories.keys())
-
 
 @dataclass
 class CredentialsConfig:
     """Sensitive configuration settings (credentials, API keys, etc.)."""
+    _comment: str = ""
     # Note: Bank API fields kept for backward compatibility but not used
     token_url: str = "https://auth.lansforsakringar.se/oauth2/token"
     api_base: str = "https://api.lansforsakringar.se/v2"

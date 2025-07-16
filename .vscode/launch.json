@@ -12,11 +12,10 @@
             "console": "integratedTerminal",
             "args": [
                 "--no-email",
-                "--report-type",
-                "monthly",
                 "--target-month",
                 "2025-06",
-                "--force-import"
+                "--force-import",
+                "--recategorize",
             ]
         }
     ]

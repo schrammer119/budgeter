@@ -66,7 +66,7 @@ class DatabaseManager:
                         conn.execute('''
                             INSERT INTO transactions
                             (date, amount, description, account_id, transaction_id, category, merchant)
-                            VALUES (?, ?, ?, ?, ?, ?)
+                            VALUES (?, ?, ?, ?, ?, ?, ?)
                         ''', (
                             tx.date.isoformat(),
                             tx.amount,

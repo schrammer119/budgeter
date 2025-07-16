@@ -119,7 +119,7 @@ class FileHandler:
             # Read the Excel file, skipping the header row
             df = pd.read_excel(file_path, skiprows=1)
 
-            for _, row in df.iterrows():
+            for i, row in df.iterrows():
                 try:
                     # Parse the transaction data based on the format
                     booking_date = pd.to_datetime(
@@ -143,7 +143,7 @@ class FileHandler:
 
                     # Create transaction ID from date and description
                     transaction_id = hashlib.md5(
-                        f"{booking_date}_{description}_{amount}".encode(
+                        f"{booking_date}_{description}_{i}_{amount}".encode(
                             'utf-8')
                     ).hexdigest()
 
