@@ -1524,7 +1524,7 @@ class BudgetAnalyzer:
             template_data.update(yearly_data)
 
         # Render template
-        template_name = f"report_template.html"
+        template_name = f"report_template2.html"
         try:
             template = self.jinja_env.get_template(template_name)
             return template.render(**template_data)

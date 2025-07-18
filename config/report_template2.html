@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Financial Report - {{ month_name }} {{ year }}</title>
+    <style>
+        /* Gmail-safe CSS */
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+            color: #333;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .header {
+            text-align: center;
+            border-bottom: 3px solid #2c3e50;
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .header h1 {
+            color: #2c3e50;
+            margin: 0;
+            font-size: 28px;
+        }
+        
+        .header .subtitle {
+            color: #7f8c8d;
+            margin: 5px 0;
+            font-size: 16px;
+        }
+        
+        .metrics-grid {
+            display: table;
+            width: 100%;
+            margin-bottom: 30px;
+        }
+        
+        .metric-row {
+            display: table-row;
+        }
+        
+        .metric-cell {
+            display: table-cell;
+            width: 25%;
+            padding: 15px;
+            text-align: center;
+            border: 1px solid #ecf0f1;
+            vertical-align: top;
+        }
+        
+        .metric-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #2c3e50;
+            margin-bottom: 5px;
+        }
+        
+        .metric-label {
+            font-size: 12px;
+            color: #7f8c8d;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .positive { color: #27ae60; }
+        .negative { color: #e74c3c; }
+        .neutral { color: #f39c12; }
+        
+        .section {
+            margin-bottom: 30px;
+        }
+        
+        .section h2 {
+            color: #2c3e50;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+            font-size: 20px;
+        }
+        
+        .chart-container {
+            margin: 20px 0;
+            text-align: center;
+        }
+        
+        .chart {
+            width: 100%;
+            height: 200px;
+            border: 1px solid #ecf0f1;
+            border-radius: 4px;
+            padding: 10px;
+            box-sizing: border-box;
+            position: relative;
+            background: linear-gradient(to right, #f8f9fa 0%, #e9ecef 100%);
+        }
+        
+        .pie-chart {
+            width: 300px;
+            height: 300px;
+            margin: 0 auto;
+            position: relative;
+        }
+        
+        .table-container {
+            overflow-x: auto;
+            margin: 20px 0;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+        
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ecf0f1;
+        }
+        
+        th {
+            background-color: #f8f9fa;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        
+        tr:hover {
+            background-color: #f8f9fa;
+        }
+        
+        .amount {
+            text-align: right;
+            font-weight: bold;
+        }
+        
+        .insight-box {
+            background-color: #f8f9fa;
+            border-left: 4px solid #3498db;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 0 4px 4px 0;
+        }
+        
+        .insight-box.warning {
+            border-left-color: #f39c12;
+        }
+        
+        .insight-box.success {
+            border-left-color: #27ae60;
+        }
+        
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background-color: #ecf0f1;
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background-color: #3498db;
+            transition: width 0.3s ease;
+        }
+        
+        .two-col {
+            display: table;
+            width: 100%;
+        }
+        
+        .col {
+            display: table-cell;
+            width: 50%;
+            padding: 0 10px;
+            vertical-align: top;
+        }
+        
+        .footer {
+            text-align: center;
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 1px solid #ecf0f1;
+            color: #7f8c8d;
+            font-size: 14px;
+        }
+        
+        @media (max-width: 600px) {
+            .metrics-grid, .metric-row, .metric-cell {
+                display: block;
+            }
+            
+            .metric-cell {
+                width: 100%;
+                margin-bottom: 10px;
+            }
+            
+            .two-col, .col {
+                display: block;
+            }
+            
+            .col {
+                width: 100%;
+                padding: 0;
+                margin-bottom: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1>Your Monthly Budget Report</h1>
+            <div class="subtitle">{{ month_name }} {{ year }}</div>
+            <div class="subtitle">Generated on {{ report_date }}</div>
+        </div>
+
+        <!-- Key Metrics -->
+        <div class="section">
+            <h2>Key Metrics</h2>
+            <div class="metrics-grid">
+                <div class="metric-row">
+                    <div class="metric-cell">
+                        <div class="metric-value positive">{{ "{:,.0f}".format(total_income).replace(',', '') }}kr</div>
+                        <div class="metric-label">Total Income</div>
+                    </div>
+                    <div class="metric-cell">
+                        <div class="metric-value negative">{{ "{:,.0f}".format(total_expenses).replace(',', '') }}kr</div>
+                        <div class="metric-label">Total Expenses</div>
+                    </div>
+                    <div class="metric-cell">
+                        <div class="metric-value {% if net_cash_flow > 0 %}positive{% elif net_cash_flow < 0 %}negative{% else %}neutral{% endif %}">{{ "{:,.0f}".format(net_cash_flow).replace(',', '') }}kr</div>
+                        <div class="metric-label">Net Cash Flow</div>
+                    </div>
+                    <div class="metric-cell">
+                        <div class="metric-value">{{ "{:,.0f}".format(total_expenses / days_in_month).replace(',', '') }}kr</div>
+                        <div class="metric-label">Avg Daily Spending</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Spending Breakdown -->
+        <div class="section">
+            <h2>Spending Breakdown</h2>
+            <div class="two-col">
+                <div class="col">
+                    <h3>By Category</h3>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Category</th>
+                                <th>Amount</th>
+                                <th>% of Expenses</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for category in category_breakdown %}
+                            <tr>
+                                <td>{{ category.name }}</td>
+                                <td class="amount">{{ "{:,.0f}".format(category.amount).replace(',', '') }}kr</td>
+                                <td class="amount">{{ "{:.1f}".format(category.percentage_of_expenses) }}%</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                <div class="col">
+                    <h3>By Type</h3>
+                    <div style="margin-bottom: 20px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                            <span>Discretionary</span>
+                            <span class="amount">{{ "{:,.0f}".format(discretionary_spending).replace(',', '') }}kr ({{ discretionary_percentage }}%)</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: {{ discretionary_percentage }}%; background-color: #3498db;"></div>
+                        </div>
+                    </div>
+                    <div style="margin-bottom: 20px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                            <span>Non-Discretionary</span>
+                            <span class="amount">{{ "{:,.0f}".format(non_discretionary_spending).replace(',', '') }}kr ({{ non_discretionary_percentage }}%)</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: {{ non_discretionary_percentage }}%; background-color: #e74c3c;"></div>
+                        </div>
+                    </div>
+                    <div style="margin-bottom: 20px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                            <span>Debt Payments</span>
+                            <span class="amount">{{ "{:,.0f}".format(debt_payments).replace(',', '') }}kr ({{ debt_percentage }}%)</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: {{ debt_percentage }}%; background-color: #f39c12;"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Income Sources -->
+        <div class="section">
+            <h2>Income Sources</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Source</th>
+                        <th>Amount</th>
+                        <th>Percentage</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for source in income_sources %}
+                    <tr>
+                        <td>{{ source.name }}</td>
+                        <td class="amount">{{ "{:,.0f}".format(source.amount).replace(',', '') }}kr</td>
+                        <td class="amount">{{ "{:.1f}".format(source.percentage) }}%</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Quarterly Analysis (if available) -->
+        {% if quarterly_data %}
+        <div class="section">
+            <h2>Quarterly Analysis - Q{{ quarter }} {{ year }}</h2>
+            <div class="metrics-grid">
+                <div class="metric-row">
+                    <div class="metric-cell">
+                        <div class="metric-value">{{ "{:,.0f}".format(quarterly_income).replace(',', '') }}kr</div>
+                        <div class="metric-label">Quarterly Income</div>
+                    </div>
+                    <div class="metric-cell">
+                        <div class="metric-value">{{ "{:,.0f}".format(quarterly_expenses).replace(',', '') }}kr</div>
+                        <div class="metric-label">Quarterly Expenses</div>
+                    </div>
+                    <div class="metric-cell">
+                        <div class="metric-value {% if quarterly_net_flow > 0 %}positive{% elif quarterly_net_flow < 0 %}negative{% else %}neutral{% endif %}">{{ "{:,.0f}".format(quarterly_net_flow).replace(',', '') }}kr</div>
+                        <div class="metric-label">Quarterly Net Flow</div>
+                    </div>
+                    <div class="metric-cell">
+                        <div class="metric-value">{{ "{:.1f}".format(quarterly_savings_pct) }}%</div>
+                        <div class="metric-label">Quarterly Savings Rate</div>
+                    </div>
+                </div>
+            </div>
+
+            <h3>Year-over-Year Changes</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Metric</th>
+                        <th>Current Quarter</th>
+                        <th>Previous Year</th>
+                        <th>Change</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Income</td>
+                        <td class="amount">{{ "{:,.0f}".format(quarterly_income).replace(',', '') }}kr</td>
+                        <td class="amount">{{ "{:,.0f}".format(yoy_previous_data[0]).replace(',', '') }}kr</td>
+                        <td class="amount {% if yoy_income_change > 0 %}positive{% elif yoy_income_change < 0 %}negative{% else %}neutral{% endif %}">{{ "{:+.1f}".format(yoy_income_change) }}%</td>
+                    </tr>
+                    <tr>
+                        <td>Expenses</td>
+                        <td class="amount">{{ "{:,.0f}".format(quarterly_expenses).replace(',', '') }}kr</td>
+                        <td class="amount">{{ "{:,.0f}".format(yoy_previous_data[1]).replace(',', '') }}kr</td>
+                        <td class="amount {% if yoy_expenses_change > 0 %}negative{% elif yoy_expenses_change < 0 %}positive{% else %}neutral{% endif %}">{{ "{:+.1f}".format(yoy_expenses_change) }}%</td>
+                    </tr>
+                    <tr>
+                        <td>Net Flow</td>
+                        <td class="amount">{{ "{:,.0f}".format(quarterly_net_flow).replace(',', '') }}kr</td>
+                        <td class="amount">{{ "{:,.0f}".format(yoy_previous_data[2]).replace(',', '') }}kr</td>
+                        <td class="amount {% if yoy_net_flow_change > 0 %}positive{% elif yoy_net_flow_change < 0 %}negative{% else %}neutral{% endif %}">{{ "{:+.1f}".format(yoy_net_flow_change) }}%</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            {% if quarterly_achievements %}
+            <div class="insight-box success">
+                <h4>Quarterly Achievements</h4>
+                <ul>
+                    {% for achievement in quarterly_achievements %}
+                    <li>{{ achievement }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+            {% endif %}
+
+            {% if quarterly_concerns %}
+            <div class="insight-box warning">
+                <h4>Areas of Concern</h4>
+                <ul>
+                    {% for concern in quarterly_concerns %}
+                    <li>{{ concern }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+            {% endif %}
+
+            {% if quarterly_recommendations %}
+            <div class="insight-box">
+                <h4>Recommendations</h4>
+                <ul>
+                    {% for recommendation in quarterly_recommendations %}
+                    <li>{{ recommendation }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+
+        <!-- Yearly Analysis (if available) -->
+        {% if yearly_data %}
+        <div class="section">
+            <h2>Annual Summary - {{ year }}</h2>
+            <div class="metrics-grid">
+                <div class="metric-row">
+                    <div class="metric-cell">
+                        <div class="metric-value">{{ "{:,.0f}".format(yearly_income).replace(',', '') }}kr</div>
+                        <div class="metric-label">Annual Income</div>
+                    </div>
+                    <div class="metric-cell">
+                        <div class="metric-value">{{ "{:,.0f}".format(yearly_expenses).replace(',', '') }}kr</div>
+                        <div class="metric-label">Annual Expenses</div>
+                    </div>
+                    <div class="metric-cell">
+                        <div class="metric-value {% if yearly_net_flow > 0 %}positive{% elif yearly_net_flow < 0 %}negative{% else %}neutral{% endif %}">{{ "{:,.0f}".format(yearly_net_flow).replace(',', '') }}kr</div>
+                        <div class="metric-label">Annual Net Flow</div>
+                    </div>
+                    <div class="metric-cell">
+                        <div class="metric-value">{{ "{:.1f}".format(yearly_savings_pct) }}%</div>
+                        <div class="metric-label">Annual Savings Rate</div>
+                    </div>
+                </div>
+            </div>
+
+            <h3>Monthly Performance Highlights</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Metric</th>
+                        <th>Best Month</th>
+                        <th>Amount</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Net Cash Flow</td>
+                        <td>{{ best_month }}</td>
+                        <td class="amount positive">{{ "{:,.0f}".format(best_month_flow).replace(',', '') }}kr</td>
+                    </tr>
+                    <tr>
+                        <td>Highest Income</td>
+                        <td>{{ peak_income_month }}</td>
+                        <td class="amount positive">{{ "{:,.0f}".format(peak_income_amount).replace(',', '') }}kr</td>
+                    </tr>
+                    <tr>
+                        <td>Highest Expenses</td>
+                        <td>{{ highest_expense_month }}</td>
+                        <td class="amount negative">{{ "{:,.0f}".format(highest_expense_amount).replace(',', '') }}kr</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>Year-over-Year Growth</h3>
+            <div class="two-col">
+                <div class="col">
+                    <div style="margin-bottom: 15px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                            <span>Income Growth</span>
+                            <span class="amount {% if yoy_income_growth > 0 %}positive{% elif yoy_income_growth < 0 %}negative{% else %}neutral{% endif %}">{{ "{:+.1f}".format(yoy_income_growth) }}%</span>
+                        </div>
+                    </div>
+                    <div style="margin-bottom: 15px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                            <span>Expense Growth</span>
+                            <span class="amount {% if yoy_expenses_growth > 0 %}negative{% elif yoy_expenses_growth < 0 %}positive{% else %}neutral{% endif %}">{{ "{:+.1f}".format(yoy_expenses_growth) }}%</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="col">
+                    <div style="margin-bottom: 15px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                            <span>Net Flow Growth</span>
+                            <span class="amount {% if yoy_net_flow_growth > 0 %}positive{% elif yoy_net_flow_growth < 0 %}negative{% else %}neutral{% endif %}">{{ "{:+.1f}".format(yoy_net_flow_growth) }}%</span>
+                        </div>
+                    </div>
+                    <div style="margin-bottom: 15px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                            <span>Stability Score</span>
+                            <span class="amount {% if stability_score > 75 %}positive{% elif stability_score < 50 %}negative{% else %}neutral{% endif %}">{{ "{:.1f}".format(stability_score) }}/100</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Financial Health Score -->
+        {% if financial_health_score %}
+        <div class="section">
+            <h2>Financial Health</h2>
+            <div style="text-align: center; margin-bottom: 20px;">
+                <div style="font-size: 48px; font-weight: bold; color: {% if financial_health_score > 75 %}#27ae60{% elif financial_health_score > 50 %}#f39c12{% else %}#e74c3c{% endif %};">
+                    {{ "{:.0f}".format(financial_health_score) }}/100
+                </div>
+                <div style="color: #7f8c8d; margin-top: 10px;">
+                    {% if financial_health_change > 0 %}
+                        <span class="positive">↑ {{ "{:.1f}".format(financial_health_change) }} points from last period</span>
+                    {% elif financial_health_change < 0 %}
+                        <span class="negative">↓ {{ "{:.1f}".format(financial_health_change|abs) }} points from last period</span>
+                    {% else %}
+                        <span class="neutral">No change from last period</span>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="progress-bar" style="height: 30px;">
+                <div class="progress-fill" style="width: {{ financial_health_score }}%; background-color: {% if financial_health_score > 75 %}#27ae60{% elif financial_health_score > 50 %}#f39c12{% else %}#e74c3c{% endif %};"></div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Footer -->
+        <div class="footer">
+            <p>This report was generated automatically based on your financial data.</p>
+            <p>For questions or concerns, please review your transaction categorization and data accuracy.</p>
+        </div>
+    </div>
+</body>
+</html>

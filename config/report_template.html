@@ -25,16 +25,16 @@
       .container {
         max-width: 1200px;
         margin: 0 auto;
-        padding: 2rem;
+        padding: 0.75rem;
       }
 
       .header {
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         color: white;
-        padding: 2rem;
+        padding: 0.75rem;
         border-radius: 12px;
         margin-bottom: 2rem;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        border: 1px solid #e2e8f0; /* Instead of box-shadow */
       }
 
       .header h1 {
@@ -48,17 +48,39 @@
       }
 
       .metrics-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-        gap: 1.5rem;
-        margin-bottom: 2rem;
+        display: block; /* Start with block for maximum compatibility */
+        margin: -0.75rem;
+        overflow: hidden; /* Contain floated elements */
+      }
+
+      .metrics-grid > * {
+        float: left;
+        width: calc(25% - 1.5rem); /* 4 columns */
+        margin: 0.75rem;
+        min-width: 250px;
+        box-sizing: border-box;
+      }
+
+      /* Clear floats */
+      .metrics-grid::after {
+        content: "";
+        display: table;
+        clear: both;
+      }
+
+      /* Single column on narrow screens */
+      @media screen and (max-width: 600px) {
+        .metrics-grid > * {
+          width: calc(50% - 1.5rem);
+          float: none;
+        }
       }
 
       .metric-card {
         background: white;
-        padding: 1.5rem;
+        padding: 0.75rem;
         border-radius: 12px;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        border: 1px solid #e2e8f0; /* Instead of box-shadow */
         border-left: 4px solid #667eea;
       }
 
@@ -102,9 +124,10 @@
 
       .chart-section {
         background: white;
-        padding: 2rem;
+        padding: 0.75rem;
         border-radius: 12px;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        border: 1px solid #e2e8f0; /* Instead of box-shadow */
+        border-top: 4px solid #667eea;
         margin-bottom: 2rem;
       }
 
@@ -115,21 +138,34 @@
       }
 
       .chart-container {
-        position: relative;
         height: 400px;
         margin-bottom: 1rem;
       }
 
       .two-column {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 2rem;
+        display: table;
+        width: 100%;
+        table-layout: fixed;
+        margin-bottom: 2rem;
+      }
+
+      .two-column > * {
+        display: table-cell;
+        width: 50%;
+        padding: 0.75rem;
       }
 
       .three-column {
-        display: grid;
-        grid-template-columns: 1fr 1fr 1fr;
-        gap: 2rem;
+        display: table;
+        width: 100%;
+        table-layout: fixed;
+        margin-bottom: 2rem;
+      }
+
+      .three-column > * {
+        display: table-cell;
+        width: 33%;
+        padding: 0.75rem;
       }
 
       .summary-table {
@@ -140,7 +176,7 @@
 
       .summary-table th,
       .summary-table td {
-        padding: 0.75rem;
+        padding: 0.5rem;
         text-align: left;
         border-bottom: 1px solid #e2e8f0;
       }
@@ -152,7 +188,7 @@
       }
 
       .alert {
-        padding: 1rem;
+        padding: 0.75rem;
         border-radius: 8px;
         margin-bottom: 1rem;
       }
@@ -175,130 +211,231 @@
         color: #065f46;
       }
 
-      /* Collapsible Transaction Sections */
-      .transaction-section {
-        background: white;
-        padding: 2rem;
-        border-radius: 12px;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-        margin-bottom: 2rem;
-      }
+        /* Transaction Sections */
+        .transaction-section {
+            background-color: #ffffff;
+            padding: 0.75rem;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border: 1px solid #e2e8f0;
+            border-top: 4px solid #667eea;
+            margin-left: auto;
+            margin-right: auto;
+        }
 
-      .category-group {
-        margin-bottom: 1.5rem;
-        border: 1px solid #e2e8f0;
-        border-radius: 8px;
-        overflow: hidden;
-      }
+        .chart-title {
+            font-size: 20px;
+            font-weight: 600;
+            color: #1e293b;
+            margin-bottom: 20px;
+            text-align: center;
+        }
 
-      .category-header {
-        background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
-        padding: 1rem 1.5rem;
-        cursor: pointer;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        transition: background-color 0.2s;
-        border-bottom: 1px solid #e2e8f0;
-      }
+        .category-group {
+            margin-bottom: 20px;
+            border: 1px solid #e2e8f0;
+            border-top: 4px solid #667eea;
+            border-radius: 6px;
+            overflow: hidden;
+        }
 
-      .category-header:hover {
-        background: linear-gradient(135deg, #e2e8f0 0%, #cbd5e1 100%);
-      }
+        .category-header {
+            background-color: #f8fafc;
+            padding: 0.75rem;
+            cursor: pointer;
+            border-bottom: 1px solid #e2e8f0;
+            position: relative;
+        }
 
-      .category-header h3 {
-        font-size: 1.1rem;
-        font-weight: 600;
-        color: #1e293b;
-        margin: 0;
-      }
+        .category-header-content {
+            display: table;
+            width: 100%;
+        }
 
-      .category-summary {
-        display: flex;
-        align-items: center;
-        gap: 1rem;
-        color: #64748b;
-        font-size: 0.9rem;
-      }
+        .category-title {
+            display: table-cell;
+            vertical-align: middle;
+            font-size: 16px;
+            font-weight: 600;
+            color: #1e293b;
+        }
 
-      .category-total {
-        font-weight: 600;
-      }
+        .category-summary {
+            display: table-cell;
+            vertical-align: middle;
+            text-align: right;
+            width: 200px;
+        }
 
-      .category-count {
-        background: #e2e8f0;
-        padding: 0.25rem 0.5rem;
-        border-radius: 12px;
-        font-size: 0.8rem;
-      }
+        .category-count {
+            background-color: #dde9f8;
+            padding: 0.5rem;
+            border-radius: 12px;
+            font-size: 12px;
+            color: #1e293b;
+            margin-right: 10px;
+            display: inline-block;
+        }
 
-      .toggle-icon {
-        font-size: 1.2rem;
-        transition: transform 0.2s;
-        color: #64748b;
-      }
+        .category-total {
+            font-weight: 600;
+            color: #1e293b;
+            font-size: 14px;
+        }
 
-      .category-header.active .toggle-icon {
-        transform: rotate(180deg);
-      }
+        .transaction-list {
+            max-height: 300px;
+            overflow-y: auto;
+        }
 
-      .transaction-list {
-        max-height: 0;
-        overflow: hidden;
-        transition: max-height 0.3s ease-out;
-      }
+        /* Desktop: 2-column layout */
+        .transaction-grid {
+            display: table;
+            width: 100%;
+            table-layout: fixed;
+        }
 
-      .transaction-list.expanded {
-        max-height: 1000px;
-        overflow-y: auto;
-      }
+        .transaction-column {
+            display: table-cell;
+            width: 50%;
+            vertical-align: top;
+            padding: 0 5px;
+        }
 
-      .transaction-item {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 0.75rem 1.5rem;
-        border-bottom: 1px solid #f3f4f6;
-      }
+        .transaction-item {
+            padding: 0.75rem;
+            border-bottom: 1px solid #f3f4f6;
+            background-color: #ffffff;
+            margin-bottom: 1px;
+        }
 
-      .transaction-item:last-child {
-        border-bottom: none;
-      }
+        .transaction-item:last-child {
+            border-bottom: none;
+        }
 
-      .transaction-item:hover {
-        background-color: #f8fafc;
-      }
+        .transaction-content {
+            display: table;
+            width: 100%;
+            table-layout: fixed;
+        }
 
-      .transaction-description {
-        flex: 1;
-        font-weight: 500;
-        color: #1e293b;
-      }
+        .transaction-description {
+            display: table-cell;
+            vertical-align: middle;
+            font-weight: 500;
+            color: #1e293b;
+            font-size: 14px;
+            width: 55%;
+            padding-right: 10px;
+        }
 
-      .transaction-date {
-        color: #6b7280;
-        font-size: 0.875rem;
-        margin-right: 1rem;
-        min-width: 80px;
-      }
+        .transaction-date {
+            display: table-cell;
+            vertical-align: middle;
+            color: #6b7280;
+            font-size: 12px;
+            width: 25%;
+            text-align: center;
+        }
 
-      .transaction-amount {
-        font-weight: 600;
-        min-width: 80px;
-        text-align: right;
-      }
+        .transaction-amount {
+            display: table-cell;
+            vertical-align: middle;
+            font-weight: 600;
+            color: #720909;
+            font-size: 14px;
+            width: 20%;
+            text-align: right;
+        }
 
-      .income-amount {
-        color: #059669;
-      }
+        .transaction-right {
+            display: table-cell;
+            vertical-align: middle;
+            text-align: right;
+            width: 40%;
+        }
 
-      .empty-category {
-        padding: 2rem;
-        text-align: center;
-        color: #6b7280;
-        font-style: italic;
-      }
+        .income-amount {
+            color: #059669;
+        }
 
+        .empty-category {
+            padding: 0.75rem;
+            text-align: center;
+            color: #6b7280;
+            font-style: italic;
+        }
+
+        /* Mobile: Single column layout */
+        @media screen and (max-width: 600px) {
+            .transaction-section {
+                padding: 0.5rem;
+                margin-bottom: 15px;
+            }
+
+            .category-header {
+                padding: 0.5rem;
+            }
+
+            .category-header-content {
+                display: block;
+            }
+
+            .category-title {
+                display: block;
+                margin-bottom: 8px;
+            }
+
+            .category-summary {
+                display: block;
+                width: 100%;
+                text-align: left;
+            }
+
+            .transaction-grid {
+                display: block;
+            }
+
+            .transaction-column {
+                display: block;
+                width: 100%;
+                padding: 0;
+            }
+
+            .transaction-item {
+                padding: 0.5rem;
+            }
+
+            .transaction-description {
+                width: 60%;
+                padding-right: 5px;
+            }
+
+            .transaction-date {
+                width: 20%;
+                text-align: left;
+                padding-right: 5px;
+            }
+
+            .transaction-amount {
+                width: 20%;
+                text-align: right;
+            }
+        }
+
+        /* Gmail-specific fixes */
+        .gmail-fix {
+            mso-table-lspace: 0pt;
+            mso-table-rspace: 0pt;
+        }
+
+        /* Outlook-specific fixes */
+        .outlook-fix {
+            border-collapse: collapse;
+            mso-line-height-rule: exactly;
+        }
+
+      /* quarterly styles */
       .quarterly-section {
         margin-top: 4rem;
         padding-top: 2rem;
@@ -313,7 +450,7 @@
           #155e75 100%
         );
         color: white;
-        padding: 2rem;
+        padding: 0.75rem;
         border-radius: 12px;
         margin-bottom: 2rem;
         box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
@@ -331,7 +468,7 @@
 
       .quarterly-metric-card {
         background: white;
-        padding: 1.5rem;
+        padding: 0.75rem;
         border-radius: 12px;
         box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
         border-left: 4px solid #0891b2;
@@ -347,7 +484,7 @@
 
       .quarterly-chart-section {
         background: white;
-        padding: 2rem;
+        padding: 0.75rem;
         border-radius: 12px;
         box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
         margin-bottom: 2rem;
@@ -355,14 +492,19 @@
       }
 
       .insights-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-        gap: 1.5rem;
-        margin-top: 1rem;
+        display: table;
+        width: 100%;
+        table-layout: fixed;
+      }
+
+      .insights-grid > * {
+        display: table-cell;
+        width: 33%;
+        padding: 0 1rem;
       }
 
       .insight-card {
-        padding: 1.5rem;
+        padding: 0.75rem;
         border-radius: 8px;
         border-left: 4px solid;
       }
@@ -397,40 +539,6 @@
         color: #374151;
       }
 
-      .projection-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-        gap: 1.5rem;
-        margin-top: 1rem;
-      }
-
-      .projection-card {
-        background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
-        padding: 1.5rem;
-        border-radius: 8px;
-        border-left: 4px solid #0891b2;
-        text-align: center;
-      }
-
-      .projection-card h3 {
-        color: #0c4a6e;
-        margin-bottom: 0.5rem;
-        font-size: 1rem;
-      }
-
-      .projection-value {
-        font-size: 1.8rem;
-        font-weight: 700;
-        color: #1e293b;
-        margin-bottom: 0.5rem;
-      }
-
-      .projection-note {
-        font-size: 0.85rem;
-        color: #64748b;
-        font-style: italic;
-      }
-
       .year-end-section {
         margin-top: 4rem;
         padding-top: 2rem;
@@ -445,7 +553,7 @@
           #4c1d95 100%
         );
         color: white;
-        padding: 2rem;
+        padding: 0.75rem;
         border-radius: 12px;
         margin-bottom: 2rem;
         box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
@@ -463,7 +571,7 @@
 
       .year-end-metric-card {
         background: white;
-        padding: 1.5rem;
+        padding: 0.75rem;
         border-radius: 12px;
         box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
         border-left: 4px solid #7c3aed;
@@ -479,7 +587,7 @@
 
       .year-end-chart-section {
         background: white;
-        padding: 2rem;
+        padding: 0.75rem;
         border-radius: 12px;
         box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
         margin-bottom: 2rem;
@@ -487,28 +595,12 @@
       }
 
       @media (max-width: 768px) {
-        .two-column,
-        .three-column {
-          grid-template-columns: 1fr;
-        }
-
         .container {
-          padding: 1rem;
+          padding: 0.75rem;
         }
 
         .header h1 {
           font-size: 2rem;
-        }
-
-        .transaction-item {
-          flex-direction: column;
-          align-items: flex-start;
-          gap: 0.5rem;
-        }
-
-        .transaction-date,
-        .transaction-amount {
-          min-width: auto;
         }
       }
     </style>
@@ -711,49 +803,59 @@
 
       <!-- Transaction Details with Collapsible Categories -->
       <div class="transaction-section">
-        <h2 class="chart-title">Transaction Details by Category</h2>
+          <h2 class="chart-title">Transaction Details by Category</h2>
 
-        {% for category in category_breakdown %}
-        <div class="category-group">
-          <div
-            class="category-header"
-            onclick="toggleCategory('{{ category.name|replace(' ', '_') }}')"
-          >
-            <h3>{{ category.name }}</h3>
-            <div class="category-summary">
-              <span class="category-count"
-                >{{ category.transactions|length }} transactions</span
-              >
-              <span class="category-total"
-                >{{ "{:,.0f}".format(category.amount).replace(',', ' ')
-                }}kr</span
-              >
-              <span class="toggle-icon">▼</span>
-            </div>
-          </div>
-
-          <div
-            id="transactions-{{ category.name|replace(' ', '_') }}"
-            class="transaction-list"
-          >
-            {% if category.transactions %} {% for transaction in
-            category.transactions %}
-            <div class="transaction-item">
-              <div class="transaction-description">
-                {{ transaction.merchant }}
+          <!-- Jinja Template for Categories -->
+          {% for category in category_breakdown %}
+          <div class="category-group">
+              <div class="category-header">
+                  <div class="category-header-content">
+                      <div class="category-title">{{ category.name }}</div>
+                      <div class="category-summary">
+                          <span class="category-count">{{ category.transactions|length }} transactions</span>
+                          <span class="category-total {% if category.amount < 0 %}income-amount{% endif %}">
+                              {{ "{:,.0f}".format(category.amount|abs).replace(',', ' ') }}kr
+                          </span>
+                      </div>
+                  </div>
               </div>
-              <div class="transaction-date">{{ transaction.date }}</div>
-              <div class="transaction-amount">
-                {{ "{:,.0f}".format(transaction.amount|abs).replace(',', ' ')
-                }}kr
+              <div class="transaction-list">
+                  {% if category.transactions %}
+                  <div class="transaction-grid">
+                      {% set half_point = ((category.transactions|length + 1) / 2)|round(0, 'floor')|int %}
+                      <div class="transaction-column">
+                          {% for transaction in category.transactions[:half_point] %}
+                          <div class="transaction-item">
+                              <div class="transaction-content">
+                                  <div class="transaction-description">{{ transaction.merchant }}</div>
+                                  <div class="transaction-date">{{ transaction.date }}</div>
+                                  <div class="transaction-amount {% if transaction.amount < 0 %}income-amount{% endif %}">
+                                      {{ "{:,.0f}".format(transaction.amount|abs).replace(',', ' ') }}kr
+                                  </div>
+                              </div>
+                          </div>
+                          {% endfor %}
+                      </div>
+                      <div class="transaction-column">
+                          {% for transaction in category.transactions[half_point:] %}
+                          <div class="transaction-item">
+                              <div class="transaction-content">
+                                  <div class="transaction-description">{{ transaction.merchant }}</div>
+                                  <div class="transaction-date">{{ transaction.date }}</div>
+                                  <div class="transaction-amount {% if transaction.amount < 0 %}income-amount{% endif %}">
+                                      {{ "{:,.0f}".format(transaction.amount|abs).replace(',', ' ') }}kr
+                                  </div>
+                              </div>
+                          </div>
+                          {% endfor %}
+                      </div>
+                  </div>
+                  {% else %}
+                  <div class="empty-category">No transactions in this category</div>
+                  {% endif %}
               </div>
-            </div>
-            {% endfor %} {% else %}
-            <div class="empty-category">No transactions in this category</div>
-            {% endif %}
           </div>
-        </div>
-        {% endfor %}
+          {% endfor %}
       </div>
 
       {% if quarterly_data %}
@@ -1486,20 +1588,6 @@
                         }
                     }
                 });
-
-                    // Collapsible categories functionality
-                    function toggleCategory(categoryId) {
-                        const transactionList = document.getElementById('transactions-' + categoryId);
-                        const header = transactionList.previousElementSibling;
-
-                        if (transactionList.classList.contains('expanded')) {
-                            transactionList.classList.remove('expanded');
-                            header.classList.remove('active');
-                        } else {
-                            transactionList.classList.add('expanded');
-                            header.classList.add('active');
-                        }
-                    }
 
                   {% if quarterly_data %}
                     // Monthly Progression Chart
