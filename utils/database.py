@@ -29,8 +29,6 @@ class DatabaseManager:
                         description TEXT NOT NULL,
                         account_id TEXT NOT NULL,
                         transaction_id TEXT UNIQUE NOT NULL,
-                        category TEXT,
-                        merchant TEXT,
                         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                     )
@@ -65,26 +63,19 @@ class DatabaseManager:
                     try:
                         conn.execute('''
                             INSERT INTO transactions
-                            (date, amount, description, account_id, transaction_id, category, merchant)
-                            VALUES (?, ?, ?, ?, ?, ?, ?)
+                            (date, amount, description, account_id, transaction_id)
+                            VALUES (?, ?, ?, ?, ?)
                         ''', (
                             tx.date.isoformat(),
                             tx.amount,
                             tx.description,
                             tx.account_id,
-                            tx.transaction_id,
-                            tx.category,
-                            tx.merchant
+                            tx.transaction_id
                         ))
                         saved_count += 1
                     except sqlite3.IntegrityError:
-                        # Transaction already exists, update category if needed
-                        if tx.category:
-                            conn.execute('''
-                                UPDATE transactions
-                                SET category = ?, merchant = ?, updated_at = CURRENT_TIMESTAMP
-                                WHERE transaction_id = ?
-                            ''', (tx.category, tx.merchant, tx.transaction_id))
+                        # Transaction already exists
+                        pass
 
                 conn.commit()
 
@@ -104,7 +95,7 @@ class DatabaseManager:
         try:
             with sqlite3.connect(self.db_path) as conn:
                 cursor = conn.execute('''
-                    SELECT date, amount, description, account_id, transaction_id, category, merchant
+                    SELECT date, amount, description, account_id, transaction_id
                     FROM transactions
                     WHERE date BETWEEN ? AND ?
                     ORDER BY date DESC
@@ -117,9 +108,7 @@ class DatabaseManager:
                         amount=row[1],
                         description=row[2],
                         account_id=row[3],
-                        transaction_id=row[4],
-                        category=row[5],
-                        merchant=row[6]
+                        transaction_id=row[4]
                     ))
 
                 logger.info(
@@ -129,25 +118,6 @@ class DatabaseManager:
         except sqlite3.Error as e:
             logger.error(f"Failed to retrieve transactions: {e}")
             raise
-
-    def update_transactions(self, transactions: List[Transaction]) -> int:
-        """Update category and merchant for a list of transactions by transaction_id."""
-        updated_count = 0
-        try:
-            with sqlite3.connect(self.db_path) as conn:
-                for tx in transactions:
-                    result = conn.execute('''
-                        UPDATE transactions
-                        SET category = ?, merchant = ?, updated_at = CURRENT_TIMESTAMP
-                        WHERE transaction_id = ?
-                    ''', (tx.category, tx.merchant, tx.transaction_id))
-                    updated_count += result.rowcount
-                conn.commit()
-        except sqlite3.Error as e:
-            logger.error(f"Failed to update transactions: {e}")
-            raise
-        logger.info(f"Updated {updated_count} transactions in database")
-        return updated_count
 
     def cleanup_old_data(self, cutoff_date: date):
         """Remove data older than specified date."""

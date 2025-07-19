@@ -12,11 +12,7 @@
             "console": "integratedTerminal",
             "args": [
                 "--report-type",
-                "yearly",
-                "--target-month",
-                "2025-06",
-                "--force-import",
-                "--recategorize",
+                "yearly"
             ]
         }
     ]

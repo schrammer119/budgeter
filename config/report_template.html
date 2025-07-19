@@ -3,2082 +3,765 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta keywords="">
-    <meta description="">
-    <title>Monthly Financial Report - {{ month_name }} {{ year }}</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <title>Financial Report - {{ month_name }} {{ year }}</title>
     <style>
-      * {
+      body {
+        font-family: Arial, sans-serif;
+        line-height: 1.4;
         margin: 0;
         padding: 0;
-        box-sizing: border-box;
-      }
-
-      body {
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
-          sans-serif;
-        background-color: #f8fafc;
-        color: #334155;
-        line-height: 1.6;
+        background-color: #f8f9fa;
+        color: #333;
       }
 
       .container {
-        max-width: 1200px;
+        max-width: 700px;
         margin: 0 auto;
-        padding: 0.75rem;
+        background-color: white;
+        padding: 20px;
       }
 
       .header {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
-        padding: 0.75rem;
-        border-radius: 12px;
-        margin-bottom: 2rem;
-        border: 1px solid #e2e8f0; /* Instead of box-shadow */
+        text-align: center;
+        border-bottom: 2px solid #2c3e50;
+        padding-bottom: 15px;
+        margin-bottom: 25px;
       }
 
       .header h1 {
-        font-size: 2.5rem;
-        margin-bottom: 0.5rem;
+        color: #2c3e50;
+        margin: 0;
+        font-size: 24px;
       }
 
-      .header p {
-        font-size: 1.1rem;
-        opacity: 0.9;
+      .subtitle {
+        color: #7f8c8d;
+        margin: 3px 0;
+        font-size: 14px;
       }
 
-      .metrics-grid {
-        display: block; /* Start with block for maximum compatibility */
-        margin: -0.75rem;
-        overflow: hidden; /* Contain floated elements */
+      .section {
+        margin-bottom: 25px;
       }
 
-      .metrics-grid > * {
-        float: left;
-        width: calc(25% - 1.5rem); /* 4 columns */
-        margin: 0.75rem;
-        min-width: 250px;
-        box-sizing: border-box;
+      .section h2 {
+        color: #2c3e50;
+        border-bottom: 2px solid #3498db;
+        padding-bottom: 8px;
+        margin-bottom: 15px;
+        font-size: 18px;
       }
 
-      /* Clear floats */
-      .metrics-grid::after {
-        content: "";
-        display: table;
-        clear: both;
+      .metrics-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-bottom: 20px;
       }
 
-      /* Single column on narrow screens */
-      @media screen and (max-width: 600px) {
-        .metrics-grid > * {
-          width: calc(50% - 1.5rem);
-          float: none;
-        }
-      }
-
-      .metric-card {
-        background: white;
-        padding: 0.75rem;
-        border-radius: 12px;
-        border: 1px solid #e2e8f0; /* Instead of box-shadow */
-        border-left: 4px solid #667eea;
-      }
-
-      .metric-card h3 {
-        font-size: 0.9rem;
-        color: #64748b;
-        margin-bottom: 0.5rem;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
+      .metrics-table td {
+        width: 25%;
+        padding: 12px;
+        text-align: center;
+        border: 1px solid #ecf0f1;
+        vertical-align: middle;
       }
 
       .metric-value {
-        font-size: 2rem;
-        font-weight: 700;
-        color: #1e293b;
-        margin-bottom: 0.25rem;
+        font-size: 20px;
+        font-weight: bold;
+        color: #2c3e50;
+        margin-bottom: 3px;
       }
 
-      .metric-percentage {
-        font-size: 0.9rem;
-        color: #64748b;
+      .metric-label {
+        font-size: 11px;
+        color: #7f8c8d;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
       }
 
       .positive {
-        color: #059669;
+        color: #27ae60;
       }
-
       .negative {
-        color: #dc2626;
+        color: #e74c3c;
+      }
+      .neutral {
+        color: #f39c12;
       }
 
-      .warning {
-        color: #d97706;
+      .content-table {
+        width: 100%;
+        border-collapse: collapse;
       }
 
-      .note-box {
-        font-size: 0.9rem;
-        color: #64748b;
-        margin-bottom: 0.8rem;
+      .content-table td {
+        width: 50%;
+        padding: 10px;
+        vertical-align: top;
       }
 
-      .chart-section {
-        background: white;
-        padding: 0.75rem;
-        border-radius: 12px;
-        border: 1px solid #e2e8f0; /* Instead of box-shadow */
-        border-top: 4px solid #667eea;
-        margin-bottom: 2rem;
+      .left-col {
+        width: 50%;
+        padding-right: 15px;
       }
 
-      .chart-title {
-        font-size: 1.5rem;
-        margin-bottom: 1rem;
-        color: #1e293b;
+      .right-col {
+        width: 50%;
+        padding-left: 15px;
+      }
+
+      .data-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-bottom: 15px;
+      }
+
+      .data-table th,
+      .data-table td {
+        padding: 8px;
+        text-align: left;
+        border-bottom: 1px solid #ecf0f1;
+      }
+
+      .data-table th {
+        background-color: #f8f9fa;
+        font-weight: bold;
+        color: #2c3e50;
+        font-size: 12px;
+      }
+
+      .data-table td {
+        font-size: 13px;
+      }
+
+      .data-table td.amount {
+        text-align: right;
+        font-weight: bold;
+      }
+
+      .bar-container {
+        margin: 8px 0;
+      }
+
+      .bar-label {
+        font-size: 13px;
+        margin-bottom: 3px;
+      }
+
+      .bar-wrapper {
+        background-color: #ecf0f1;
+        height: 16px;
+        border-radius: 8px;
+        overflow: hidden;
+        position: relative;
+      }
+
+      .bar-fill {
+        height: 100%;
+        background-color: #3498db;
+        border-radius: 8px;
+      }
+
+      .bar-fill.discretionary {
+        background-color: #3498db;
+      }
+      .bar-fill.non-discretionary {
+        background-color: #e74c3c;
+      }
+      .bar-fill.savings {
+        background-color: #27ae60;
+      }
+      .bar-fill.debt {
+        background-color: #f39c12;
+      }
+
+      .bar-text {
+        position: absolute;
+        right: 5px;
+        top: 50%;
+        transform: translateY(-50%);
+        font-size: 11px;
+        color: #333;
+        font-weight: bold;
+      }
+
+      .yoy-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-bottom: 15px;
+      }
+
+      .yoy-table th,
+      .yoy-table td {
+        padding: 8px;
+        text-align: center;
+        border: 1px solid #ecf0f1;
+        font-size: 12px;
+      }
+
+      .yoy-table th {
+        background-color: #f8f9fa;
+        font-weight: bold;
+        color: #2c3e50;
+      }
+
+      .insight-box {
+        background-color: #f8f9fa;
+        border-left: 3px solid #3498db;
+        padding: 10px;
+        margin: 10px 0;
+      }
+
+      .insight-box.warning {
+        border-left-color: #f39c12;
+      }
+
+      .insight-box.success {
+        border-left-color: #27ae60;
+      }
+
+      .insight-box h4 {
+        margin: 0 0 5px 0;
+        font-size: 14px;
+        color: #2c3e50;
+      }
+
+      .insight-box ul {
+        margin: 0;
+        padding-left: 15px;
+      }
+
+      .insight-box li {
+        font-size: 12px;
+        margin-bottom: 3px;
       }
 
       .chart-container {
-        height: 400px;
-        margin-bottom: 1rem;
-      }
-
-      .two-column {
-        display: table;
         width: 100%;
-        table-layout: fixed;
-        margin-bottom: 2rem;
+        margin: 15px 0;
+        text-align: center;
       }
 
-      .two-column > * {
-        display: table-cell;
-        width: 50%;
-        padding: 0.75rem;
+      .chart-image {
+        max-width: 100%;
+        height: auto;
+        border: 1px solid #ecf0f1;
+        border-radius: 4px;
       }
 
-      .three-column {
-        display: table;
-        width: 100%;
-        table-layout: fixed;
-        margin-bottom: 2rem;
+      .footer {
+        text-align: center;
+        margin-top: 30px;
+        padding-top: 15px;
+        border-top: 1px solid #ecf0f1;
+        color: #7f8c8d;
+        font-size: 12px;
       }
 
-      .three-column > * {
-        display: table-cell;
-        width: 33%;
-        padding: 0.75rem;
-      }
-
-      .summary-table {
-        width: 100%;
-        border-collapse: collapse;
-        margin-top: 1rem;
-      }
-
-      .summary-table th,
-      .summary-table td {
-        padding: 0.5rem;
-        text-align: left;
-        border-bottom: 1px solid #e2e8f0;
-      }
-
-      .summary-table th {
-        background-color: #f8fafc;
-        font-weight: 600;
-        color: #475569;
-      }
-
-      .alert {
-        padding: 0.75rem;
-        border-radius: 8px;
-        margin-bottom: 1rem;
-      }
-
-      .alert-info {
-        background-color: #dbeafe;
-        border-left: 4px solid #3b82f6;
-        color: #1e40af;
-      }
-
-      .alert-warning {
-        background-color: #fef3c7;
-        border-left: 4px solid #f59e0b;
-        color: #92400e;
-      }
-
-      .alert-success {
-        background-color: #d1fae5;
-        border-left: 4px solid #10b981;
-        color: #065f46;
-      }
-
-        /* Transaction Sections */
-        .transaction-section {
-            background-color: #ffffff;
-            padding: 0.75rem;
-            border-radius: 8px;
-            margin-bottom: 20px;
-            border: 1px solid #e2e8f0;
-            border-top: 4px solid #667eea;
-            margin-left: auto;
-            margin-right: auto;
-        }
-
-        .chart-title {
-            font-size: 20px;
-            font-weight: 600;
-            color: #1e293b;
-            margin-bottom: 20px;
-            text-align: center;
-        }
-
-        .category-group {
-            margin-bottom: 20px;
-            border: 1px solid #e2e8f0;
-            border-top: 4px solid #667eea;
-            border-radius: 6px;
-            overflow: hidden;
-        }
-
-        .category-header {
-            background-color: #f8fafc;
-            padding: 0.75rem;
-            cursor: pointer;
-            border-bottom: 1px solid #e2e8f0;
-            position: relative;
-        }
-
-        .category-header-content {
-            display: table;
-            width: 100%;
-        }
-
-        .category-title {
-            display: table-cell;
-            vertical-align: middle;
-            font-size: 16px;
-            font-weight: 600;
-            color: #1e293b;
-        }
-
-        .category-summary {
-            display: table-cell;
-            vertical-align: middle;
-            text-align: right;
-            width: 200px;
-        }
-
-        .category-count {
-            background-color: #dde9f8;
-            padding: 0.5rem;
-            border-radius: 12px;
-            font-size: 12px;
-            color: #1e293b;
-            margin-right: 10px;
-            display: inline-block;
-        }
-
-        .category-total {
-            font-weight: 600;
-            color: #1e293b;
-            font-size: 14px;
-        }
-
-        .transaction-list {
-            max-height: 300px;
-            overflow-y: auto;
-        }
-
-        /* Desktop: 2-column layout */
-        .transaction-grid {
-            display: table;
-            width: 100%;
-            table-layout: fixed;
-        }
-
-        .transaction-column {
-            display: table-cell;
-            width: 50%;
-            vertical-align: top;
-            padding: 0 5px;
-        }
-
-        .transaction-item {
-            padding: 0.75rem;
-            border-bottom: 1px solid #f3f4f6;
-            background-color: #ffffff;
-            margin-bottom: 1px;
-        }
-
-        .transaction-item:last-child {
-            border-bottom: none;
-        }
-
-        .transaction-content {
-            display: table;
-            width: 100%;
-            table-layout: fixed;
-        }
-
-        .transaction-description {
-            display: table-cell;
-            vertical-align: middle;
-            font-weight: 500;
-            color: #1e293b;
-            font-size: 14px;
-            width: 55%;
-            padding-right: 10px;
-        }
-
-        .transaction-date {
-            display: table-cell;
-            vertical-align: middle;
-            color: #6b7280;
-            font-size: 12px;
-            width: 25%;
-            text-align: center;
-        }
-
-        .transaction-amount {
-            display: table-cell;
-            vertical-align: middle;
-            font-weight: 600;
-            color: #720909;
-            font-size: 14px;
-            width: 20%;
-            text-align: right;
-        }
-
-        .transaction-right {
-            display: table-cell;
-            vertical-align: middle;
-            text-align: right;
-            width: 40%;
-        }
-
-        .income-amount {
-            color: #059669;
-        }
-
-        .empty-category {
-            padding: 0.75rem;
-            text-align: center;
-            color: #6b7280;
-            font-style: italic;
-        }
-
-        /* Mobile: Single column layout */
-        @media screen and (max-width: 600px) {
-            .transaction-section {
-                padding: 0.5rem;
-                margin-bottom: 15px;
-            }
-
-            .category-header {
-                padding: 0.5rem;
-            }
-
-            .category-header-content {
-                display: block;
-            }
-
-            .category-title {
-                display: block;
-                margin-bottom: 8px;
-            }
-
-            .category-summary {
-                display: block;
-                width: 100%;
-                text-align: left;
-            }
-
-            .transaction-grid {
-                display: block;
-            }
-
-            .transaction-column {
-                display: block;
-                width: 100%;
-                padding: 0;
-            }
-
-            .transaction-item {
-                padding: 0.5rem;
-            }
-
-            .transaction-description {
-                width: 60%;
-                padding-right: 5px;
-            }
-
-            .transaction-date {
-                width: 20%;
-                text-align: left;
-                padding-right: 5px;
-            }
-
-            .transaction-amount {
-                width: 20%;
-                text-align: right;
-            }
-        }
-
-        /* Gmail-specific fixes */
-        .gmail-fix {
-            mso-table-lspace: 0pt;
-            mso-table-rspace: 0pt;
-        }
-
-        /* Outlook-specific fixes */
-        .outlook-fix {
-            border-collapse: collapse;
-            mso-line-height-rule: exactly;
-        }
-
-      /* quarterly styles */
-      .quarterly-section {
-        margin-top: 4rem;
-        padding-top: 2rem;
-        border-top: 3px solid #0891b2;
-      }
-
-      .quarterly-header {
-        background: linear-gradient(
-          135deg,
-          #0891b2 0%,
-          #0e7490 50%,
-          #155e75 100%
-        );
-        color: white;
-        padding: 0.75rem;
-        border-radius: 12px;
-        margin-bottom: 2rem;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-      }
-
-      .quarterly-header h1 {
-        font-size: 2.5rem;
-        margin-bottom: 0.5rem;
-      }
-
-      .quarterly-header p {
-        font-size: 1.1rem;
-        opacity: 0.9;
-      }
-
-      .quarterly-metric-card {
-        background: white;
-        padding: 0.75rem;
-        border-radius: 12px;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-        border-left: 4px solid #0891b2;
-      }
-
-      .quarterly-metric-card h3 {
-        font-size: 0.9rem;
-        color: #64748b;
-        margin-bottom: 0.5rem;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-      }
-
-      .quarterly-chart-section {
-        background: white;
-        padding: 0.75rem;
-        border-radius: 12px;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-        margin-bottom: 2rem;
-        border-top: 3px solid #0891b2;
-      }
-
-      .insights-grid {
-        display: table;
-        width: 100%;
-        table-layout: fixed;
-      }
-
-      .insights-grid > * {
-        display: table-cell;
-        width: 33%;
-        padding: 0 1rem;
-      }
-
-      .insight-card {
-        padding: 0.75rem;
-        border-radius: 8px;
-        border-left: 4px solid;
-      }
-
-      .insight-card.positive {
-        background-color: #d1fae5;
-        border-left-color: #10b981;
-      }
-
-      .insight-card.warning {
-        background-color: #fef3c7;
-        border-left-color: #f59e0b;
-      }
-
-      .insight-card.info {
-        background-color: #dbeafe;
-        border-left-color: #3b82f6;
-      }
-
-      .insight-card h3 {
-        margin-bottom: 1rem;
-        color: #1e293b;
-      }
-
-      .insight-card ul {
-        margin: 0;
-        padding-left: 1.5rem;
-      }
-
-      .insight-card li {
-        margin-bottom: 0.5rem;
-        color: #374151;
-      }
-
-      .year-end-section {
-        margin-top: 4rem;
-        padding-top: 2rem;
-        border-top: 3px solid #7c3aed;
-      }
-
-      .year-end-header {
-        background: linear-gradient(
-          135deg,
-          #7c3aed 0%,
-          #5b21b6 50%,
-          #4c1d95 100%
-        );
-        color: white;
-        padding: 0.75rem;
-        border-radius: 12px;
-        margin-bottom: 2rem;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-      }
-
-      .year-end-header h1 {
-        font-size: 2.5rem;
-        margin-bottom: 0.5rem;
-      }
-
-      .year-end-header p {
-        font-size: 1.1rem;
-        opacity: 0.9;
-      }
-
-      .year-end-metric-card {
-        background: white;
-        padding: 0.75rem;
-        border-radius: 12px;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-        border-left: 4px solid #7c3aed;
-      }
-
-      .year-end-metric-card h3 {
-        font-size: 0.9rem;
-        color: #64748b;
-        margin-bottom: 0.5rem;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-      }
-
-      .year-end-chart-section {
-        background: white;
-        padding: 0.75rem;
-        border-radius: 12px;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-        margin-bottom: 2rem;
-        border-top: 3px solid #7c3aed;
-      }
-
-      @media (max-width: 768px) {
-        .container {
-          padding: 0.75rem;
-        }
-
-        .header h1 {
-          font-size: 2rem;
-        }
+      h3 {
+        color: #2c3e50;
+        font-size: 14px;
+        margin: 15px 0 10px 0;
       }
     </style>
   </head>
-
   <body>
     <div class="container">
+      <!-- Header -->
       <div class="header">
-        <h1>Monthly Financial Report</h1>
-        <p>{{ month_name }} {{ year }} • Generated on {{ report_date }}</p>
+        <h1>Monthly Budget Report</h1>
+        <div class="subtitle">{{ month_name }} {{ year }}</div>
+        <div class="subtitle">Generated on {{ report_date }}</div>
       </div>
 
-      <!-- Key Metrics -->
-      <div class="metrics-grid">
-        <div class="metric-card">
-          <h3>Total Income</h3>
-          <div class="metric-value positive">
-            {{ "{:,.0f}".format(total_income).replace(',', ' ') }}kr
-          </div>
-        </div>
+      <!-- Monthly Section -->
+      <div class="section">
+        <h2>Monthly Overview</h2>
 
-        <div class="metric-card">
-          <h3>Total Expenses</h3>
-          <div class="metric-value negative">
-            {{ "{:,.0f}".format(total_expenses).replace(',', ' ') }}kr
-          </div>
-        </div>
+        <!-- Metrics Cards -->
+        <table class="metrics-table">
+          <tr>
+            <td>
+              <div class="metric-value positive">
+                {{ "{:,.0f}".format(total_income).replace(',',' ') }}kr
+              </div>
+              <div class="metric-label">Total Income</div>
+            </td>
+            <td>
+              <div class="metric-value negative">
+                {{ "{:,.0f}".format(total_expenses).replace(',',' ') }}kr
+              </div>
+              <div class="metric-label">Total Expenses</div>
+            </td>
+            <td>
+              <div
+                class="metric-value {% if net_cash_flow > 0 %}positive{% elif net_cash_flow < 0 %}negative{% else %}neutral{% endif %}"
+              >
+                {{ "{:,.0f}".format(net_cash_flow).replace(',',' ') }}kr
+              </div>
+              <div class="metric-label">Net Cash Flow</div>
+            </td>
+            <td>
+              <div class="metric-value">
+                {{ "{:,.0f}".format(total_expenses / days_in_month).replace(',',' ') }}kr
+              </div>
+              <div class="metric-label">Avg Daily Spending</div>
+            </td>
+          </tr>
+        </table>
 
-        <div class="metric-card">
-          <h3>Net Cash Flow</h3>
-          <div
-            class="metric-value {{ 'positive' if net_cash_flow >= 0 else 'negative' }}"
-          >
-            {{ "{:,.0f}".format(net_cash_flow).replace(',', ' ') }}kr
-          </div>
-        </div>
+        <!-- Two Column Layout -->
+        <table class="content-table">
+          <tr>
+            <td class="left-col">
+              <h3>Category Breakdown</h3>
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Category</th>
+                    <th>Amount</th>
+                    <th>% of Income</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for category in category_breakdown %}
+                  <tr>
+                    <td>{{ category.name }}</td>
+                    <td class="amount">
+                      {{ "{:,.0f}".format(category.amount).replace(',',' ') }}kr
+                    </td>
+                    <td class="amount">
+                      {{ "{:.1f}".format(category.amount / total_income * 100) }}%
+                    </td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </td>
+            <td class="right-col">
+              <h3>Spending Type Breakdown</h3>
+              <div class="bar-container">
+                <div class="bar-label">
+                  Discretionary: {{ "{:,.0f}".format(discretionary_spending).replace(',',' ')
+                  }}kr ({{ "{:.1f}".format(discretionary_percentage) }}%)
+                </div>
+                <div class="bar-wrapper">
+                  <div
+                    class="bar-fill discretionary"
+                    style="width: {{ discretionary_percentage }}%;"
+                  ></div>
+                </div>
+              </div>
+              <div class="bar-container">
+                <div class="bar-label">
+                  Non-Discretionary: {{
+                  "{:,.0f}".format(non_discretionary_spending).replace(',',' ') }}kr ({{
+                  "{:.1f}".format(non_discretionary_percentage) }}%)
+                </div>
+                <div class="bar-wrapper">
+                  <div
+                    class="bar-fill non-discretionary"
+                    style="width: {{ non_discretionary_percentage }}%;"
+                  ></div>
+                </div>
+              </div>
+              <div class="bar-container">
+                <div class="bar-label">
+                  Savings: {{ "{:,.0f}".format(savings_amount).replace(',',' ') }}kr ({{
+                  "{:.1f}".format(savings_rate) }}%)
+                </div>
+                <div class="bar-wrapper">
+                  <div
+                    class="bar-fill savings"
+                    style="width: {{ savings_rate }}%;"
+                  ></div>
+                </div>
+              </div>
+              <div class="bar-container">
+                <div class="bar-label">
+                  Debt: {{ "{:,.0f}".format(debt_payments).replace(',',' ') }}kr ({{
+                  "{:.1f}".format(debt_percentage) }}%)
+                </div>
+                <div class="bar-wrapper">
+                  <div
+                    class="bar-fill debt"
+                    style="width: {{ debt_percentage }}%;"
+                  ></div>
+                </div>
+              </div>
 
-        <div class="metric-card">
-          <h3>Average Daily Spending</h3>
-          <div class="metric-value">
-            {{ "{:,.0f}".format(total_expenses / days_in_month).replace(',', '
-            ') }}kr
-          </div>
-          <div class="metric-percentage">Based on {{ days_in_month }} days</div>
-        </div>
-
-        <div class="metric-card">
-          <h3>Discretionary Spending</h3>
-          <div class="metric-value">
-            {{ "%.1f"|format(discretionary_percentage) }}%
-          </div>
-          <div class="metric-percentage">
-            {{ "{:,.0f}".format(discretionary_spending).replace(',', ' ') }}kr
-          </div>
-        </div>
-
-        <div class="metric-card">
-          <h3>Non-Discretionary</h3>
-          <div class="metric-value">
-            {{ "%.1f"|format(non_discretionary_percentage) }}%
-          </div>
-          <div class="metric-percentage">
-            {{ "{:,.0f}".format(non_discretionary_spending).replace(',', ' ')
-            }}kr
-          </div>
-        </div>
-
-        <div class="metric-card">
-          <h3>Savings Rate</h3>
-          <div
-            class="metric-value {{ 'positive' if savings_rate >= 20 else 'warning' if savings_rate >= 10 else 'negative' }}"
-          >
-            {{ "%.1f"|format(savings_rate) }}%
-          </div>
-          <div class="metric-percentage">
-            {{ "{:,.0f}".format(savings_amount).replace(',', ' ') }}kr
-          </div>
-        </div>
-
-        <div class="metric-card">
-          <h3>Debt Payment Rate</h3>
-          <div class="metric-value">{{ "%.1f"|format(debt_percentage) }}%</div>
-          <div
-            class="metric-percentage {{ 'warning' if debt_percentage > 30 else '' }}"
-          >
-            {{ "{:,.0f}".format(debt_payments).replace(',', ' ') }}kr
-          </div>
-        </div>
-      </div>
-
-      <div class="note-box">
-        <em
-          >Note: All percentages shown above are calculated as a percentage of
-          total income.</em
-        >
-      </div>
-
-      <!-- Financial Health Alerts -->
-      {% if net_cash_flow < 0 %}
-      <div class="alert alert-warning">
-        <strong>Negative Cash Flow:</strong> You spent {{
-        "{:,.0f}".format(-net_cash_flow).replace(',', ' ') }}kr more than you
-        earned this month.
-      </div>
-      {% endif %} {% if debt_percentage > 30 %}
-      <div class="alert alert-warning">
-        <strong>High Debt Burden:</strong> Your debt payments represent {{
-        "%.1f"|format(debt_percentage) }}% of income, which is above the
-        recommended 30% threshold.
-      </div>
-      {% endif %} {% if savings_rate < 10 %}
-      <div class="alert alert-warning">
-        <strong>Low Savings Rate:</strong> Your savings rate of {{
-        "%.1f"|format(savings_rate) }}% is below the recommended 20%. Consider
-        reducing discretionary spending or increasing income.
-      </div>
-      {% endif %} {% if savings_rate >= 20 %}
-      <div class="alert alert-success">
-        <strong>Excellent Savings Rate:</strong> Your {{
-        "%.1f"|format(savings_rate) }}% savings rate meets or exceeds the
-        recommended 20%. Keep up the great work!
-      </div>
-      {% endif %}
-
-      <!-- Charts Section -->
-      <div class="three-column">
-        <div class="chart-section">
-          <h2 class="chart-title">Spending by Category</h2>
-          <div class="chart-container">
-            <canvas id="categoryBarChart"></canvas>
-          </div>
-        </div>
-
-        <div class="chart-section">
-          <h2 class="chart-title">Spending Distribution</h2>
-          <div class="chart-container">
-            <canvas id="categoryPieChart"></canvas>
-          </div>
-        </div>
-
-        <div class="chart-section">
-          <h2 class="chart-title">Expense Types</h2>
-          <div class="chart-container">
-            <canvas id="discretionaryChart"></canvas>
-          </div>
-        </div>
-      </div>
-
-      <!-- Detailed Breakdown -->
-      <div class="chart-section">
-        <h2 class="chart-title">Detailed Category Breakdown</h2>
-        <table class="summary-table">
-          <thead>
-            <tr>
-              <th>Category</th>
-              <th>Amount</th>
-              <th>% of Total Expenses</th>
-              <th>% of Income</th>
-              <th>Type</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for category in category_breakdown %}
-            <tr>
-              <td>{{ category.name }}</td>
-              <td>
-                {{ "{:,.0f}".format(category.amount).replace(',', ' ') }}kr
-              </td>
-              <td>{{ "%.1f"|format(category.percentage_of_expenses) }}%</td>
-              <td>{{ "%.1f"|format(category.percentage_of_income) }}%</td>
-              <td>{{ category.type }}</td>
-            </tr>
-            {% endfor %}
-          </tbody>
+              <h3>Income Sources</h3>
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Source</th>
+                    <th>Amount</th>
+                    <th>%</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for source in income_sources %}
+                  <tr>
+                    <td>{{ source.name }}</td>
+                    <td class="amount">
+                      {{ "{:,.0f}".format(source.amount).replace(',',' ') }}kr
+                    </td>
+                    <td class="amount">
+                      {{ "{:.1f}".format(source.percentage) }}%
+                    </td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </td>
+          </tr>
         </table>
       </div>
 
-      <!-- Income Sources -->
-      <div class="chart-section">
-        <h2 class="chart-title">Income Sources</h2>
-        <table class="summary-table">
-          <thead>
-            <tr>
-              <th>Source</th>
-              <th>Amount</th>
-              <th>% of Total Income</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for source in income_sources %}
-            <tr>
-              <td>{{ source.name }}</td>
-              <td>{{ "{:,.0f}".format(source.amount).replace(',', ' ') }}kr</td>
-              <td>{{ "%.1f"|format(source.percentage) }}%</td>
-            </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-
-      <!-- Transaction Details with Collapsible Categories -->
-      <div class="transaction-section">
-          <h2 class="chart-title">Transaction Details by Category</h2>
-
-          <!-- Jinja Template for Categories -->
-          {% for category in category_breakdown %}
-          <div class="category-group">
-              <div class="category-header">
-                  <div class="category-header-content">
-                      <div class="category-title">{{ category.name }}</div>
-                      <div class="category-summary">
-                          <span class="category-count">{{ category.transactions|length }} transactions</span>
-                          <span class="category-total {% if category.amount < 0 %}income-amount{% endif %}">
-                              {{ "{:,.0f}".format(category.amount|abs).replace(',', ' ') }}kr
-                          </span>
-                      </div>
-                  </div>
-              </div>
-              <div class="transaction-list">
-                  {% if category.transactions %}
-                  <div class="transaction-grid">
-                      {% set half_point = ((category.transactions|length + 1) / 2)|round(0, 'floor')|int %}
-                      <div class="transaction-column">
-                          {% for transaction in category.transactions[:half_point] %}
-                          <div class="transaction-item">
-                              <div class="transaction-content">
-                                  <div class="transaction-description">{{ transaction.merchant }}</div>
-                                  <div class="transaction-date">{{ transaction.date }}</div>
-                                  <div class="transaction-amount {% if transaction.amount < 0 %}income-amount{% endif %}">
-                                      {{ "{:,.0f}".format(transaction.amount|abs).replace(',', ' ') }}kr
-                                  </div>
-                              </div>
-                          </div>
-                          {% endfor %}
-                      </div>
-                      <div class="transaction-column">
-                          {% for transaction in category.transactions[half_point:] %}
-                          <div class="transaction-item">
-                              <div class="transaction-content">
-                                  <div class="transaction-description">{{ transaction.merchant }}</div>
-                                  <div class="transaction-date">{{ transaction.date }}</div>
-                                  <div class="transaction-amount {% if transaction.amount < 0 %}income-amount{% endif %}">
-                                      {{ "{:,.0f}".format(transaction.amount|abs).replace(',', ' ') }}kr
-                                  </div>
-                              </div>
-                          </div>
-                          {% endfor %}
-                      </div>
-                  </div>
-                  {% else %}
-                  <div class="empty-category">No transactions in this category</div>
-                  {% endif %}
-              </div>
-          </div>
-          {% endfor %}
-      </div>
-
+      <!-- Quarterly Section -->
       {% if quarterly_data %}
-      <div class="quarterly-section">
-        <div class="quarterly-header">
-          <h1>Quarterly Financial Analysis</h1>
-          <p>
-            Q{{ quarter }} {{ year }} • {{ quarter_months[0] }} - {{
-            quarter_months[2] }}
-          </p>
+      <div class="section">
+        <h2>Quarterly Analysis - Q{{ quarter }} {{ year }}</h2>
+
+        <!-- Quarterly Metrics -->
+        <table class="metrics-table">
+          <tr>
+            <td>
+              <div class="metric-value positive">
+                {{ "{:,.0f}".format(quarterly_income).replace(',',' ') }}kr
+              </div>
+              <div class="metric-label">Quarterly Income</div>
+            </td>
+            <td>
+              <div class="metric-value negative">
+                {{ "{:,.0f}".format(quarterly_expenses).replace(',',' ') }}kr
+              </div>
+              <div class="metric-label">Quarterly Expenses</div>
+            </td>
+            <td>
+              <div
+                class="metric-value {% if quarterly_net_flow > 0 %}positive{% elif quarterly_net_flow < 0 %}negative{% else %}neutral{% endif %}"
+              >
+                {{ "{:,.0f}".format(quarterly_net_flow).replace(',',' ') }}kr
+              </div>
+              <div class="metric-label">Quarterly Net Flow</div>
+            </td>
+            <td>
+              <div class="metric-value">
+                {{ "{:.1f}".format(quarterly_savings_pct) }}%
+              </div>
+              <div class="metric-label">Quarterly Savings Rate</div>
+            </td>
+          </tr>
+        </table>
+
+        <!-- Year-over-Year Table -->
+        <h3>Year-over-Year Comparison</h3>
+        <table class="yoy-table">
+          <thead>
+            <tr>
+              <th>Metric</th>
+              <th>Previous Year</th>
+              <th>Current Quarter</th>
+              <th>Change</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Income</td>
+              <td>{{ "{:,.0f}".format(yoy_previous_data[0]).replace(',',' ') }}kr</td>
+              <td>{{ "{:,.0f}".format(quarterly_income).replace(',',' ') }}kr</td>
+              <td
+                class="{% if yoy_income_change > 0 %}positive{% elif yoy_income_change < 0 %}negative{% else %}neutral{% endif %}"
+              >
+                {{ "{:+.1f}".format(yoy_income_change) }}%
+              </td>
+            </tr>
+            <tr>
+              <td>Expenses</td>
+              <td>{{ "{:,.0f}".format(yoy_previous_data[1]).replace(',',' ') }}kr</td>
+              <td>{{ "{:,.0f}".format(quarterly_expenses).replace(',',' ') }}kr</td>
+              <td
+                class="{% if yoy_expenses_change > 0 %}negative{% elif yoy_expenses_change < 0 %}positive{% else %}neutral{% endif %}"
+              >
+                {{ "{:+.1f}".format(yoy_expenses_change) }}%
+              </td>
+            </tr>
+            <tr>
+              <td>Net Flow</td>
+              <td>{{ "{:,.0f}".format(yoy_previous_data[2]).replace(',',' ') }}kr</td>
+              <td>{{ "{:,.0f}".format(quarterly_net_flow).replace(',',' ') }}kr</td>
+              <td
+                class="{% if yoy_net_flow_change > 0 %}positive{% elif yoy_net_flow_change < 0 %}negative{% else %}neutral{% endif %}"
+              >
+                {{ "{:+.1f}".format(yoy_net_flow_change) }}%
+              </td>
+            </tr>
+            <tr>
+              <td>Discretionary</td>
+              <td>
+                {{ "{:.1f}".format(yoy_previous_data[3] / yoy_previous_data[0] *
+                100) }}%
+              </td>
+              <td>{{ "{:.1f}".format(quarterly_discretionary_pct) }}%</td>
+              <td
+                class="{% if yoy_discretionary_change > 0 %}negative{% elif yoy_discretionary_change < 0 %}positive{% else %}neutral{% endif %}"
+              >
+                {{ "{:+.1f}".format(yoy_discretionary_change) }}pp
+              </td>
+            </tr>
+            <tr>
+              <td>Non-Discretionary</td>
+              <td>
+                {{ "{:.1f}".format(yoy_previous_data[4] / yoy_previous_data[0] *
+                100) }}%
+              </td>
+              <td>{{ "{:.1f}".format(quarterly_non_discretionary_pct) }}%</td>
+              <td
+                class="{% if yoy_non_discretionary_change > 0 %}negative{% elif yoy_non_discretionary_change < 0 %}positive{% else %}neutral{% endif %}"
+              >
+                {{ "{:+.1f}".format(yoy_non_discretionary_change) }}pp
+              </td>
+            </tr>
+            <tr>
+              <td>Savings</td>
+              <td>
+                {{ "{:.1f}".format(yoy_previous_data[6] / yoy_previous_data[0] *
+                100) }}%
+              </td>
+              <td>{{ "{:.1f}".format(quarterly_savings_pct) }}%</td>
+              <td
+                class="{% if yoy_savings_change > 0 %}positive{% elif yoy_savings_change < 0 %}negative{% else %}neutral{% endif %}"
+              >
+                {{ "{:+.1f}".format(yoy_savings_change) }}pp
+              </td>
+            </tr>
+            <tr>
+              <td>Debt</td>
+              <td>
+                {{ "{:.1f}".format(yoy_previous_data[5] / yoy_previous_data[0] *
+                100) }}%
+              </td>
+              <td>{{ "{:.1f}".format(quarterly_debt_pct) }}%</td>
+              <td
+                class="{% if yoy_debt_change > 0 %}negative{% elif yoy_debt_change < 0 %}positive{% else %}neutral{% endif %}"
+              >
+                {{ "{:+.1f}".format(yoy_debt_change) }}pp
+              </td>
+            </tr>
+          </tbody>
+        </table>
+
+        <!-- Insights -->
+        {% if quarterly_achievements %}
+        <div class="insight-box success">
+          <h4>Achievements</h4>
+          <ul>
+            {% for achievement in quarterly_achievements %}
+            <li>{{ achievement }}</li>
+            {% endfor %}
+          </ul>
         </div>
-
-        <!-- Quarterly Key Metrics -->
-        <div class="metrics-grid">
-          <div class="quarterly-metric-card">
-            <h3>Quarterly Income</h3>
-            <div class="metric-value positive">
-              {{ "{:,.0f}".format(quarterly_income).replace(',', ' ') }}kr
-            </div>
-            <div class="metric-percentage">
-              {% if yoy_income_change >= 0 %}
-              <span class="positive"
-                >+{{ "%.1f"|format(yoy_income_change) }}%</span
-              >
-              {% else %}
-              <span class="negative"
-                >{{ "%.1f"|format(yoy_income_change) }}%</span
-              >
-              {% endif %} vs Q{{ quarter }} {{ year - 1 }}
-            </div>
-          </div>
-
-          <div class="quarterly-metric-card">
-            <h3>Quarterly Expenses</h3>
-            <div class="metric-value negative">
-              {{ "{:,.0f}".format(quarterly_expenses).replace(',', ' ') }}kr
-            </div>
-            <div class="metric-percentage">
-              {% if yoy_expenses_change >= 0 %}
-              <span class="negative"
-                >+{{ "%.1f"|format(yoy_expenses_change) }}%</span
-              >
-              {% else %}
-              <span class="positive"
-                >{{ "%.1f"|format(yoy_expenses_change) }}%</span
-              >
-              {% endif %} vs Q{{ quarter }} {{ year - 1 }}
-            </div>
-          </div>
-
-          <div class="quarterly-metric-card">
-            <h3>Quarterly Net Flow</h3>
-            <div
-              class="metric-value {{ 'positive' if quarterly_net_flow >= 0 else 'negative' }}"
-            >
-              {{ "{:,.0f}".format(quarterly_net_flow).replace(',', ' ') }}kr
-            </div>
-            <div class="metric-percentage">
-              {% if yoy_net_flow_change >= 0 %}
-              <span class="positive"
-                >+{{ "%.1f"|format(yoy_net_flow_change) }}%</span
-              >
-              {% else %}
-              <span class="negative"
-                >{{ "%.1f"|format(yoy_net_flow_change) }}%</span
-              >
-              {% endif %} vs Q{{ quarter }} {{ year - 1 }}
-            </div>
-          </div>
-
-          <div class="quarterly-metric-card">
-            <h3>Quarterly Discretionary</h3>
-            <div class="metric-value">
-              {{ "%.1f"|format(quarterly_discretionary_pct) }}%
-            </div>
-            <div class="metric-percentage">
-              {% if yoy_discretionary_change > 0 %}
-              <span class="negative"
-                >+{{ "%.1f"|format(yoy_discretionary_change) }}pp</span
-              >
-              {% else %}
-              <span class="positive"
-                >{{ "%.1f"|format(yoy_discretionary_change) }}pp</span
-              >
-              {% endif %} vs Q{{ quarter }} {{ year - 1 }}
-            </div>
-          </div>
-
-          <div class="quarterly-metric-card">
-            <h3>Quarterly Non-Discretionary</h3>
-            <div class="metric-value">
-              {{ "%.1f"|format(quarterly_non_discretionary_pct) }}%
-            </div>
-            <div class="metric-percentage">
-              {% if yoy_non_discretionary_change > 0 %}
-              <span class="negative"
-                >+{{ "%.1f"|format(yoy_non_discretionary_change) }}pp</span
-              >
-              {% else %}
-              <span class="positive"
-                >{{ "%.1f"|format(yoy_non_discretionary_change) }}pp</span
-              >
-              {% endif %} vs Q{{ quarter }} {{ year - 1 }}
-            </div>
-          </div>
-
-          <div class="quarterly-metric-card">
-            <h3>Quarterly Savings Rate</h3>
-            <div
-              class="metric-value {{ 'positive' if quarterly_savings_pct >= 20 else 'warning' if quarterly_savings_pct >= 10 else 'negative' }}"
-            >
-              {{ "%.1f"|format(quarterly_savings_pct) }}%
-            </div>
-            <div class="metric-percentage">
-              {% if yoy_savings_change > 0 %}
-              <span class="positive"
-                >+{{ "%.1f"|format(yoy_savings_change) }}pp</span
-              >
-              {% else %}
-              <span class="negative"
-                >{{ "%.1f"|format(yoy_savings_change) }}pp</span
-              >
-              {% endif %} vs Q{{ quarter }} {{ year - 1 }}
-            </div>
-          </div>
-
-          <div class="quarterly-metric-card">
-            <h3>Quarterly Debt Rate</h3>
-            <div
-              class="metric-value {{ 'negative' if quarterly_debt_pct > 30 else '' }}"
-            >
-              {{ "%.1f"|format(quarterly_debt_pct) }}%
-            </div>
-            <div class="metric-percentage">
-              {% if yoy_debt_change >= 0 %}
-              <span class="positive"
-                >+{{ "%.1f"|format(yoy_debt_change) }}pp</span
-              >
-              {% else %}
-              <span class="negative"
-                >{{ "%.1f"|format(yoy_debt_change) }}pp</span
-              >
-              {% endif %} vs Q{{ quarter }} {{ year - 1 }}
-            </div>
-          </div>
-
-          <div class="quarterly-metric-card">
-            <h3>Financial Health Score</h3>
-            <div
-              class="metric-value {{ 'positive' if financial_health_score >= 80 else 'warning' if financial_health_score >= 60 else 'negative' }}"
-            >
-              {{ financial_health_score }}/100
-            </div>
-            <div class="metric-percentage">
-              {% if financial_health_change >= 0 %}
-              <span class="positive">+{{ financial_health_change }}</span>
-              {% else %}
-              <span class="negative">{{ financial_health_change }}</span>
-              {% endif %} vs last quarter
-            </div>
-          </div>
+        {% endif %} {% if quarterly_concerns %}
+        <div class="insight-box warning">
+          <h4>Areas of Concern</h4>
+          <ul>
+            {% for concern in quarterly_concerns %}
+            <li>{{ concern }}</li>
+            {% endfor %}
+          </ul>
         </div>
-
-        <!-- Quarterly Trends Charts -->
-        <div class="three-column">
-          <div class="quarterly-chart-section">
-            <h2 class="chart-title">Metric Progression</h2>
-            <div class="chart-container">
-              <canvas id="quarterlyProgressionChart1"></canvas>
-            </div>
-          </div>
-
-          <div class="quarterly-chart-section">
-            <h2 class="chart-title">Spending Progression</h2>
-            <div class="chart-container">
-              <canvas id="quarterlyProgressionChart2"></canvas>
-            </div>
-          </div>
-
-          <div class="quarterly-chart-section">
-            <h2 class="chart-title">Year-over-Year Comparison</h2>
-            <div class="chart-container">
-              <canvas id="yoyComparisonChart"></canvas>
-            </div>
-          </div>
-        </div>
-
-        <!-- Category Analysis -->
-        <div class="two-column">
-          <div class="quarterly-chart-section">
-            <h2 class="chart-title">Top Category Changes (YoY)</h2>
-            <div class="chart-container">
-              <canvas id="categoryChangesChart"></canvas>
-            </div>
-          </div>
-
-          <div class="quarterly-chart-section">
-            <h2 class="chart-title">Expense Volatility by Category</h2>
-            <div class="chart-container">
-              <canvas id="volatilityChart"></canvas>
-            </div>
-          </div>
-        </div>
-
-        <!-- Quarterly Summary Tables -->
-        <div class="quarterly-chart-section">
-          <h2 class="chart-title">Quarter-over-Quarter Performance</h2>
-          <table class="summary-table">
-            <thead>
-              <tr>
-                <th>Metric</th>
-                <th>
-                  Q{{ quarter - 1 if quarter > 1 else 4 }} {{ year if quarter >
-                  1 else year - 1 }}
-                </th>
-                <th>Q{{ quarter }} {{ year }}</th>
-                <th>Change</th>
-                <th>% Change</th>
-              </tr>
-            </thead>
-            <tbody>
-              {% for metric in qoq_comparison %}
-              <tr>
-                <td>{{ metric.name }}</td>
-                <td>
-                  {{ "{:,.0f}".format(metric.previous).replace(',', ' ') }}kr
-                </td>
-                <td>
-                  {{ "{:,.0f}".format(metric.current).replace(',', ' ') }}kr
-                </td>
-                <td>
-                  {{ "{:+,.0f}".format(metric.change).replace(',', ' ') }}kr
-                </td>
-                <td>{{ "{:+.1f}".format(metric.percentage_change) }}%</td>
-              </tr>
-              {% endfor %}
-            </tbody>
-          </table>
-        </div>
-
-        <!-- Quarterly Insights -->
-        <div class="quarterly-chart-section">
-          <h2 class="chart-title">Quarterly Financial Insights</h2>
-
-          <div class="insights-grid">
-            <div class="insight-card positive">
-              <h3>🎯 Achievements</h3>
-              <ul>
-                {% for achievement in quarterly_achievements %}
-                <li>{{ achievement }}</li>
-                {% endfor %}
-              </ul>
-            </div>
-
-            <div class="insight-card warning">
-              <h3>⚠️ Areas for Improvement</h3>
-              <ul>
-                {% for concern in quarterly_concerns %}
-                <li>{{ concern }}</li>
-                {% endfor %}
-              </ul>
-            </div>
-
-            <div class="insight-card info">
-              <h3>📈 Recommendations</h3>
-              <ul>
-                {% for recommendation in quarterly_recommendations %}
-                <li>{{ recommendation }}</li>
-                {% endfor %}
-              </ul>
-            </div>
-          </div>
-        </div>
-      </div>
-      {% endif %} {% if yearly_data %}
-      <div class="year-end-section">
-        <div class="year-end-header">
-          <h1>Year-End Financial Analysis</h1>
-          <p>{{ year }} Annual Report • Full Year Summary</p>
-        </div>
-
-        <!-- Year-End Key Metrics -->
-        <div class="metrics-grid">
-          <div class="year-end-metric-card">
-            <h3>Annual Income</h3>
-            <div class="metric-value positive">
-              {{ "{:,.0f}".format(yearly_income).replace(',', ' ') }}kr
-            </div>
-            <div class="metric-percentage">
-              {% if yoy_income_growth >= 0 %}
-              <span class="positive"
-                >+{{ "%.1f"|format(yoy_income_growth) }}%</span
-              >
-              {% else %}
-              <span class="negative"
-                >{{ "%.1f"|format(yoy_income_growth) }}%</span
-              >
-              {% endif %} vs {{ year - 1 }}
-            </div>
-          </div>
-
-          <div class="year-end-metric-card">
-            <h3>Annual Expenses</h3>
-            <div class="metric-value negative">
-              {{ "{:,.0f}".format(yearly_expenses).replace(',', ' ') }}kr
-            </div>
-            <div class="metric-percentage">
-              {% if yoy_expenses_growth >= 0 %}
-              <span class="negative"
-                >+{{ "%.1f"|format(yoy_expenses_growth) }}%</span
-              >
-              {% else %}
-              <span class="positive"
-                >{{ "%.1f"|format(yoy_expenses_growth) }}%</span
-              >
-              {% endif %} vs {{ year - 1 }}
-            </div>
-          </div>
-
-          <div class="year-end-metric-card">
-            <h3>Annual Net Cash Flow</h3>
-            <div
-              class="metric-value {{ 'positive' if yearly_net_flow >= 0 else 'negative' }}"
-            >
-              {{ "{:,.0f}".format(yearly_net_flow).replace(',', ' ') }}kr
-            </div>
-            <div class="metric-percentage">
-              {% if yoy_net_flow_growth >= 0 %}
-              <span class="positive"
-                >+{{ "%.1f"|format(yoy_net_flow_growth) }}%</span
-              >
-              {% else %}
-              <span class="negative"
-                >{{ "%.1f"|format(yoy_net_flow_growth) }}%</span
-              >
-              {% endif %} vs {{ year - 1 }}
-            </div>
-          </div>
-
-          <div class="year-end-metric-card">
-            <h3>Average Daily Spending</h3>
-            <div class="metric-value">
-              {{ "{:,.0f}".format(yearly_avg_daily).replace(',', ' ') }}kr
-            </div>
-            <div class="metric-percentage">
-              {% if yoy_daily_growth >= 0 %}
-              <span class="negative"
-                >+{{ "%.1f"|format(yoy_daily_growth) }}%</span
-              >
-              {% else %}
-              <span class="positive"
-                >{{ "%.1f"|format(yoy_daily_growth) }}%</span
-              >
-              {% endif %} vs {{ year - 1 }}
-            </div>
-          </div>
-
-          <div class="year-end-metric-card">
-            <h3>Annual Discretionary</h3>
-            <div class="metric-value">
-              {{ "%.1f"|format(yearly_discretionary_pct) }}%
-            </div>
-            <div class="metric-percentage">
-              {{ "{:,.0f}".format(yearly_discretionary).replace(',', ' ') }}kr
-            </div>
-          </div>
-
-          <div class="year-end-metric-card">
-            <h3>Annual Non-Disc.</h3>
-            <div class="metric-value">
-              {{ "%.1f"|format(yearly_non_discretionary_pct) }}%
-            </div>
-            <div class="metric-percentage">
-              {{ "{:,.0f}".format(yearly_non_discretionary).replace(',', ' ')
-              }}kr
-            </div>
-          </div>
-
-          <div class="year-end-metric-card">
-            <h3>Annual Savings Rate</h3>
-            <div
-              class="metric-value {{ 'positive' if yearly_savings_pct >= 20 else 'warning' if yearly_savings_pct >= 10 else 'negative' }}"
-            >
-              {{ "%.1f"|format(yearly_savings_pct) }}%
-            </div>
-            <div class="metric-percentage">
-              {{ "{:,.0f}".format(yearly_savings).replace(',', ' ') }}kr
-            </div>
-          </div>
-
-          <div class="year-end-metric-card">
-            <h3>Annual Debt Rate</h3>
-            <div
-              class="metric-value {{ 'negative' if yearly_debt_pct > 30 else '' }}"
-            >
-              {{ "%.1f"|format(yearly_debt_pct) }}%
-            </div>
-            <div class="metric-percentage">
-              {{ "{:,.0f}".format(yearly_debt).replace(',', ' ') }}kr
-            </div>
-          </div>
-
-          <div class="year-end-metric-card">
-            <h3>Best Month</h3>
-            <div class="metric-value positive">{{ best_month }}</div>
-            <div class="metric-percentage">
-              {{ "{:,.0f}".format(best_month_flow).replace(',', ' ') }}kr net
-            </div>
-          </div>
-
-          <div class="year-end-metric-card">
-            <h3>Peak Income Month</h3>
-            <div class="metric-value positive">{{ peak_income_month }}</div>
-            <div class="metric-percentage">
-              {{ "{:,.0f}".format(peak_income_amount).replace(',', ' ') }}kr
-            </div>
-          </div>
-
-          <div class="year-end-metric-card">
-            <h3>Highest Expense Month</h3>
-            <div class="metric-value negative">{{ highest_expense_month }}</div>
-            <div class="metric-percentage">
-              {{ "{:,.0f}".format(highest_expense_amount).replace(',', ' ') }}kr
-            </div>
-          </div>
-
-          <div class="year-end-metric-card">
-            <h3>Financial Stability Score</h3>
-            <div
-              class="metric-value {{ 'positive' if stability_score >= 80 else 'warning' if stability_score >= 60 else 'negative' }}"
-            >
-              {{ stability_score }}/100
-            </div>
-            <div class="metric-percentage">Based on consistency metrics</div>
-          </div>
-        </div>
-
-        <!-- Year-End Financial Health Alerts -->
-        {% if yearly_net_flow < 0 %}
-        <div class="alert alert-warning">
-          <strong>Annual Loss:</strong> You had a net loss of {{
-          "{:,.0f}".format(-yearly_net_flow).replace(',', ' ') }}kr this year.
-          Consider reviewing your budget and spending patterns.
-        </div>
-        {% endif %} {% if yearly_debt_pct > 30 %}
-        <div class="alert alert-warning">
-          <strong>High Annual Debt Burden:</strong> Your annual debt payments
-          represent {{ "%.1f"|format(yearly_debt_pct) }}% of income, which is
-          above the recommended 30% threshold.
-        </div>
-        {% endif %} {% if yearly_savings_pct < 10 %}
-        <div class="alert alert-warning">
-          <strong>Low Annual Savings Rate:</strong> Your annual savings rate of
-          {{ "%.1f"|format(yearly_savings_pct) }}% is below the recommended 20%.
-          This limits your financial security and growth potential.
-        </div>
-        {% endif %} {% if yearly_savings_pct >= 20 %}
-        <div class="alert alert-success">
-          <strong>Excellent Annual Savings:</strong> Your {{
-          "%.1f"|format(yearly_savings_pct) }}% annual savings rate meets or
-          exceeds the recommended 20%. You're building strong financial
-          security!
-        </div>
-        {% endif %} {% if stability_score >= 80 %}
-        <div class="alert alert-success">
-          <strong>High Financial Stability:</strong> Your financial patterns
-          show excellent consistency and stability throughout the year.
+        {% endif %} {% if quarterly_recommendations %}
+        <div class="insight-box">
+          <h4>Recommendations</h4>
+          <ul>
+            {% for recommendation in quarterly_recommendations %}
+            <li>{{ recommendation }}</li>
+            {% endfor %}
+          </ul>
         </div>
         {% endif %}
+      </div>
+      {% endif %}
 
-        <!-- Year-End Charts Section -->
-        <div class="three-column">
-          <div class="year-end-chart-section">
-            <h2 class="chart-title">Annual Income Sources</h2>
-            <div class="chart-container">
-              <canvas id="yearlyIncomeSourcesChart"></canvas>
-            </div>
-          </div>
+      <!-- Yearly Section -->
+      {% if yearly_data %}
+      <div class="section">
+        <h2>Annual Summary - {{ year }}</h2>
 
-          <div class="year-end-chart-section">
-            <h2 class="chart-title">Annual Category Spending</h2>
-            <div class="chart-container">
-              <canvas id="yearlyCategorySpendingChart"></canvas>
-            </div>
-          </div>
+        <!-- Annual Metrics -->
+        <table class="metrics-table">
+          <tr>
+            <td>
+              <div class="metric-value positive">
+                {{ "{:,.0f}".format(yearly_income).replace(',',' ') }}kr
+              </div>
+              <div class="metric-label">Annual Income</div>
+            </td>
+            <td>
+              <div class="metric-value negative">
+                {{ "{:,.0f}".format(yearly_expenses).replace(',',' ') }}kr
+              </div>
+              <div class="metric-label">Annual Expenses</div>
+            </td>
+            <td>
+              <div
+                class="metric-value {% if yearly_net_flow > 0 %}positive{% elif yearly_net_flow < 0 %}negative{% else %}neutral{% endif %}"
+              >
+                {{ "{:,.0f}".format(yearly_net_flow).replace(',',' ') }}kr
+              </div>
+              <div class="metric-label">Annual Net Flow</div>
+            </td>
+            <td>
+              <div class="metric-value">
+                {{ "{:.1f}".format(yearly_savings_pct) }}%
+              </div>
+              <div class="metric-label">Annual Savings Rate</div>
+            </td>
+          </tr>
+        </table>
 
-          <div class="year-end-chart-section">
-            <h2 class="chart-title">Annual Spending Types</h2>
-            <div class="chart-container">
-              <canvas id="yearlySpendingTypesChart"></canvas>
-            </div>
-          </div>
+        <!-- Two Column Layout for Yearly -->
+        <table class="content-table">
+          <tr>
+            <td class="left-col">
+              <h3>Annual Category Breakdown</h3>
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Category</th>
+                    <th>Amount</th>
+                    <th>% of Income</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for i in range(yearly_category_labels|length) %}
+                  <tr>
+                    <td>{{ yearly_category_labels[i] }}</td>
+                    <td class="amount">
+                      {{ "{:,.0f}".format(yearly_category_amounts[i]).replace(',',' ') }}kr
+                    </td>
+                    <td class="amount">
+                      {{ "{:.1f}".format(yearly_category_amounts[i] /
+                      yearly_income * 100) }}%
+                    </td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </td>
+            <td class="right-col">
+              <h3>Annual Spending Type Breakdown</h3>
+              <div class="bar-container">
+                <div class="bar-label">
+                  Discretionary: {{ "{:,.0f}".format(yearly_discretionary).replace(',',' ') }}kr
+                  ({{ "{:.1f}".format(yearly_discretionary_pct) }}%)
+                </div>
+                <div class="bar-wrapper">
+                  <div
+                    class="bar-fill discretionary"
+                    style="width: {{ yearly_discretionary_pct }}%;"
+                  ></div>
+                </div>
+              </div>
+              <div class="bar-container">
+                <div class="bar-label">
+                  Non-Discretionary: {{
+                  "{:,.0f}".format(yearly_non_discretionary).replace(',',' ') }}kr ({{
+                  "{:.1f}".format(yearly_non_discretionary_pct) }}%)
+                </div>
+                <div class="bar-wrapper">
+                  <div
+                    class="bar-fill non-discretionary"
+                    style="width: {{ yearly_non_discretionary_pct }}%;"
+                  ></div>
+                </div>
+              </div>
+              <div class="bar-container">
+                <div class="bar-label">
+                  Savings: {{ "{:,.0f}".format(yearly_savings).replace(',',' ') }}kr ({{
+                  "{:.1f}".format(yearly_savings_pct) }}%)
+                </div>
+                <div class="bar-wrapper">
+                  <div
+                    class="bar-fill savings"
+                    style="width: {{ yearly_savings_pct }}%;"
+                  ></div>
+                </div>
+              </div>
+              <div class="bar-container">
+                <div class="bar-label">
+                  Debt: {{ "{:,.0f}".format(yearly_debt).replace(',',' ') }}kr ({{
+                  "{:.1f}".format(yearly_debt_pct) }}%)
+                </div>
+                <div class="bar-wrapper">
+                  <div
+                    class="bar-fill debt"
+                    style="width: {{ yearly_debt_pct }}%;"
+                  ></div>
+                </div>
+              </div>
+
+              <h3>Annual Income Sources</h3>
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Source</th>
+                    <th>Amount</th>
+                    <th>%</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for i in range(yearly_income_labels|length) %}
+                  <tr>
+                    <td>{{ yearly_income_labels[i] }}</td>
+                    <td class="amount">
+                      {{ "{:,.0f}".format(yearly_income_amounts[i]).replace(',',' ') }}kr
+                    </td>
+                    <td class="amount">
+                      {{ "{:.1f}".format(yearly_income_amounts[i] /
+                      yearly_income * 100) }}%
+                    </td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </td>
+          </tr>
+        </table>
+
+        <!-- Charts -->
+        <h3>Monthly Progression</h3>
+        <div class="chart-container">
+          <img
+            src="cid:{{ spending_type_chart }}"
+            alt="Monthly Income/Expense/Net Flow Progression"
+            class="chart-image"
+          />
         </div>
 
-        <!-- Monthly Progression Charts -->
-        <div class="two-column">
-          <div class="year-end-chart-section">
-            <h2 class="chart-title">Monthly Cash Flow Progression</h2>
-            <div class="chart-container">
-              <canvas id="monthlyCashFlowChart"></canvas>
-            </div>
-          </div>
-
-          <div class="year-end-chart-section">
-            <h2 class="chart-title">Monthly Spending Percentage Trends</h2>
-            <div class="chart-container">
-              <canvas id="monthlyPercentageChart"></canvas>
-            </div>
-          </div>
-        </div>
-
-        <!-- Category Trends -->
-        <div class="year-end-chart-section">
-          <h2 class="chart-title">Category Spending Throughout the Year</h2>
-          <div class="chart-container">
-            <canvas id="categoryTrendsChart"></canvas>
-          </div>
-        </div>
-
-        <!-- Year-End Summary Tables -->
-        <div class="year-end-chart-section">
-          <h2 class="chart-title">Monthly Performance Summary</h2>
-          <table class="summary-table">
-            <thead>
-              <tr>
-                <th>Month</th>
-                <th>Income</th>
-                <th>Expenses</th>
-                <th>Net Flow</th>
-                <th>Discretionary %</th>
-                <th>Non-Discretionary %</th>
-                <th>Savings Rate</th>
-                <th>Debt Rate</th>
-              </tr>
-            </thead>
-            <tbody>
-              {% for month_data in monthly_summary %}
-              <tr>
-                <td>{{ month_data.month }}</td>
-                <td>
-                  {{ "{:,.0f}".format(month_data.income).replace(',', ' ') }}kr
-                </td>
-                <td>
-                  {{ "{:,.0f}".format(month_data.expenses).replace(',', ' ')
-                  }}kr
-                </td>
-                <td
-                  class="{{ 'positive' if month_data.net_flow >= 0 else 'negative' }}"
-                >
-                  {{ "{:,.0f}".format(month_data.net_flow).replace(',', ' ')
-                  }}kr
-                </td>
-                <td>{{ "%.1f"|format(month_data.discretionary_pct) }}%</td>
-                <td>{{ "%.1f"|format(month_data.non_discretionary_pct) }}%</td>
-                <td
-                  class="{{ 'positive' if month_data.savings_rate >= 20 else 'warning' if month_data.savings_rate >= 10 else 'negative' }}"
-                >
-                  {{ "%.1f"|format(month_data.savings_rate) }}%
-                </td>
-                <td
-                  class="{{ 'positive' if month_data.debt_rate >= 30 else '' }}"
-                >
-                  {{ "%.1f"|format(month_data.debt_rate) }}%
-                </td>
-              </tr>
-              {% endfor %}
-            </tbody>
-          </table>
-        </div>
-
-        <!-- Category Year-over-Year Analysis -->
-        <div class="year-end-chart-section">
-          <h2 class="chart-title">Category Year-over-Year Analysis</h2>
-          <table class="summary-table">
-            <thead>
-              <tr>
-                <th>Category</th>
-                <th>{{ year - 1 }}</th>
-                <th>{{ year }}</th>
-                <th>Change</th>
-                <th>% Change</th>
-                <th>Trend</th>
-              </tr>
-            </thead>
-            <tbody>
-              {% for category in category_yoy_analysis %}
-              <tr>
-                <td>{{ category.name }}</td>
-                <td>
-                  {{ "{:,.0f}".format(category.previous_year).replace(',', ' ')
-                  }}kr
-                </td>
-                <td>
-                  {{ "{:,.0f}".format(category.current_year).replace(',', ' ')
-                  }}kr
-                </td>
-                <td>
-                  {{ "{:+,.0f}".format(category.change).replace(',', ' ') }}kr
-                </td>
-                <td>
-                  {{ "{:+.1f}".format(category.percentage_change) }}%
-                </td>
-                <td>{{ category.trend }}</td>
-              </tr>
-              {% endfor %}
-            </tbody>
-          </table>
+        <h3>Spending Type Trends</h3>
+        <div class="chart-container">
+          <img
+            src="cid:{{ category_spending_chart }}"
+            alt="Monthly Spending Type Distribution"
+            class="chart-image"
+          />
         </div>
       </div>
       {% endif %}
+
+      <!-- Footer -->
+      <div class="footer">
+        <p>
+          This report was generated automatically based on your financial data.
+        </p>
+        <p>
+          For questions or concerns, please review your transaction
+          categorization.
+        </p>
+      </div>
     </div>
-
-    <script>
-                    // Chart.js configuration
-                    Chart.defaults.font.family = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
-                    Chart.defaults.color = '#64748b';
-
-                    // Category Bar Chart
-                    const categoryBarCtx = document.getElementById('categoryBarChart').getContext('2d');
-                    new Chart(categoryBarCtx, {
-                        type: 'bar',
-                        data: {
-                            labels: {{ category_labels | tojson }},
-                        datasets: [{
-                            label: 'Amount (kr)',
-                            data: {{ category_amounts | tojson }},
-                        backgroundColor: [
-                            '#667eea', '#764ba2', '#f093fb', '#f5576c', '#4facfe', '#43e97b',
-                            '#fa709a', '#fee140', '#a8edea', '#d299c2', '#ffd89b', '#19547b'
-                        ],
-                        borderRadius: 4
-                        }]
-                    },
-                        options: {
-                        indexAxis: 'y',
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: {
-                            legend: {
-                                display: false
-                            }
-                        },
-                        scales: {
-                            x: {
-                                beginAtZero: true,
-                                ticks: {
-                                    callback: function (value) {
-                                        return value.toLocaleString() + 'kr';
-                                    }
-                                }
-                            }
-                        }
-                    }
-                });
-
-                    // Category Pie Chart
-                    const categoryPieCtx = document.getElementById('categoryPieChart').getContext('2d');
-                    new Chart(categoryPieCtx, {
-                        type: 'pie',
-                        data: {
-                            labels: {{ category_labels | tojson }},
-                        datasets: [{
-                            data: {{ category_amounts | tojson }},
-                        backgroundColor: [
-                            '#667eea', '#764ba2', '#f093fb', '#f5576c', '#4facfe', '#43e97b',
-                            '#fa709a', '#fee140', '#a8edea', '#d299c2', '#ffd89b', '#19547b'
-                        ]
-                        }]
-                    },
-                        options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: {
-                            legend: {
-                                position: 'bottom',
-                                labels: {
-                                    padding: 20,
-                                    usePointStyle: true
-                                }
-                            },
-                            tooltip: {
-                                callbacks: {
-                                    label: function (context) {
-                                        const label = context.label || '';
-                                        const value = context.parsed;
-                                        const total = context.dataset.data.reduce((a, b) => a + b, 0);
-                                        const percentage = ((value / total) * 100).toFixed(1);
-                                        return label + ': ' + value.toLocaleString() + 'kr (' + percentage + '%)';
-                                    }
-                                }
-                            }
-                        }
-                    }
-                });
-
-                    // Discretionary vs Non-Discretionary Chart
-                    const discretionaryCtx = document.getElementById('discretionaryChart').getContext('2d');
-                    new Chart(discretionaryCtx, {
-                        type: 'doughnut',
-                        data: {
-                            labels: ['Discretionary', 'Non-Discretionary', 'Debt', 'Savings'],
-                            datasets: [{
-                                data: [{{ discretionary_spending }}, {{ non_discretionary_spending }}, {{ debt_payments }}, {{ savings_amount }}],
-                        backgroundColor: ['#f59e0b', '#3b82f6', '#dc2626', '#10b981'],
-                        borderWidth: 0
-                    }]
-                    },
-                        options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: {
-                            legend: {
-                                position: 'bottom',
-                                labels: {
-                                    padding: 20,
-                                    usePointStyle: true
-                                }
-                            },
-                            tooltip: {
-                                callbacks: {
-                                    label: function (context) {
-                                        const label = context.label || '';
-                                        const value = context.parsed;
-                                        const total = context.dataset.data.reduce((a, b) => a + b, 0);
-                                        const percentage = ((value / total) * 100).toFixed(1);
-                                        return label + ': ' + value.toLocaleString() + 'kr (' + percentage + '%)';
-                                    }
-                                }
-                            }
-                        }
-                    }
-                });
-
-                  {% if quarterly_data %}
-                    // Monthly Progression Chart
-                    const quarterlyProgressionCtx1 = document.getElementById('quarterlyProgressionChart1').getContext('2d');
-                    new Chart(quarterlyProgressionCtx1, {
-                        type: 'line',
-                        data: {
-                            labels: {{ quarter_months | tojson }},
-                        datasets: [
-                        {
-                            label: 'Income',
-                            data: {{ monthly_income_data | tojson }},
-                            borderColor: '#10b981',
-                            backgroundColor: 'rgba(16, 185, 129, 0.1)',
-                            fill: true,
-                            tension: 0.4
-                        },
-                        {
-                            label: 'Expenses',
-                            data: {{ monthly_expenses_data | tojson }},
-                        borderColor: '#dc2626',
-                        backgroundColor: 'rgba(220, 38, 38, 0.1)',
-                        fill: true,
-                        tension: 0.4
-                        },
-                        {
-                            label: 'Cashflow',
-                            data: {{ monthly_cashflow_data | tojson }},
-                        borderColor: '#0891b2',
-                        backgroundColor: 'rgba(8, 145, 178, 0.1)',
-                        fill: true,
-                        tension: 0.4
-                        }
-                    ]
-                },
-                        options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: {
-                            legend: {
-                                position: 'top'
-                            }
-                        },
-                        scales: {
-                            y: {
-                                beginAtZero: true,
-                                ticks: {
-                                    callback: function (value) {
-                                        return value.toLocaleString() + 'kr';
-                                    }
-                                }
-                            }
-                        }
-                    }
-            });
-
-                    const quarterlyProgressionCtx2 = document.getElementById('quarterlyProgressionChart2').getContext('2d');
-                    new Chart(quarterlyProgressionCtx2, {
-                        type: 'line',
-                        data: {
-                            labels: {{ quarter_months | tojson }},
-                        datasets: [
-                        {
-                            label: 'Discretionary',
-                            data: {{ monthly_discretionary_data | tojson }},
-                        borderColor: '#10b981',
-                        backgroundColor: 'rgba(16, 185, 129, 0.1)',
-                        fill: true,
-                        tension: 0.4
-                        },
-                        {
-                            label: 'Non-Discretionary',
-                            data: {{ monthly_non_discretionary_data | tojson }},
-                        borderColor: '#dc2626',
-                        backgroundColor: 'rgba(220, 38, 38, 0.1)',
-                        fill: true,
-                        tension: 0.4
-                        },
-                        {
-                            label: 'Savings',
-                            data: {{ monthly_savings_data | tojson }},
-                        borderColor: '#0891b2',
-                        backgroundColor: 'rgba(8, 145, 178, 0.1)',
-                        fill: true,
-                        tension: 0.4
-                        },
-                        {
-                            label: 'Debt',
-                            data: {{ monthly_debt_data | tojson }},
-                        borderColor: '#a855f7',
-                        backgroundColor: 'rgba(168, 85, 247, 0.1)',
-                        fill: true,
-                        tension: 0.4
-                        }
-                    ]
-                },
-                        options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: {
-                            legend: {
-                                position: 'top'
-                            }
-                        },
-                        scales: {
-                            y: {
-                                beginAtZero: true,
-                                ticks: {
-                                    callback: function (value) {
-                                        return value.toLocaleString() + 'kr';
-                                    }
-                                }
-                            }
-                        }
-                    }
-            });
-
-                    // Year-over-Year Comparison Chart
-                    const yoyComparisonCtx = document.getElementById('yoyComparisonChart').getContext('2d');
-                    new Chart(yoyComparisonCtx, {
-                        type: 'bar',
-                        data: {
-                            labels: ['Income', 'Expenses', 'Net Flow', 'Savings'],
-                            datasets: [
-                                  {
-                                    label: 'Q{{ quarter }} {{ year - 1 }}',
-                                    data: {{ yoy_previous_data | tojson }},
-                                    backgroundColor: 'rgba(148, 163, 184, 0.8)',
-                                    borderColor: '#94a3b8',
-                                    borderWidth: 1
-                                },
-                                {
-                                    label: 'Q{{ quarter }} {{ year }}',
-                                    data: {{ yoy_current_data | tojson }},
-                                    backgroundColor: 'rgba(8, 145, 178, 0.8)',
-                                    borderColor: '#0891b2',
-                                    borderWidth: 1
-                                }
-                            ]
-                        },
-                        options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: {
-                            legend: {
-                                position: 'top'
-                            }
-                        },
-                        scales: {
-                            y: {
-                                beginAtZero: true,
-                                ticks: {
-                                    callback: function (value) {
-                                        return value.toLocaleString() + 'kr';
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    });
-
-                    // Category Changes Chart
-                    const categoryChangesCtx = document.getElementById('categoryChangesChart').getContext('2d');
-                    new Chart(categoryChangesCtx, {
-                        type: 'bar',
-                        data: {
-                            labels: {{ category_change_labels | tojson }},
-                        datasets: [{
-                            label: 'Change (%)',
-                            data: {{ category_change_data | tojson }},
-                        backgroundColor: function (context) {
-                            const value = context.parsed.y;
-                            return value >= 0 ? 'rgba(220, 38, 38, 0.8)' : 'rgba(16, 185, 129, 0.8)';
-                        },
-                        borderColor: function (context) {
-                            const value = context.parsed.y;
-                            return value >= 0 ? '#dc2626' : '#10b981';
-                        },
-                        borderWidth: 1
-                            }]
-                        },
-                        options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        indexAxis: 'y',
-                        plugins: {
-                            legend: {
-                                display: false
-                            }
-                        },
-                        scales: {
-                            x: {
-                                beginAtZero: true,
-                                ticks: {
-                                    callback: function (value) {
-                                        return value + '%';
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    });
-
-                    // Volatility Chart
-                    const volatilityCtx = document.getElementById('volatilityChart').getContext('2d');
-                    new Chart(volatilityCtx, {
-                        type: 'bar',
-                        data: {
-                            labels: {{ volatility_labels | tojson }},
-                        datasets: [{
-                            label: 'Volatility Score',
-                            data: {{ volatility_data | tojson }},
-                        backgroundColor: 'rgba(245, 158, 11, 0.8)',
-                        borderColor: '#f59e0b',
-                        borderWidth: 1
-                            }]
-                        },
-                        options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: {
-                            legend: {
-                                display: false
-                            }
-                        },
-                        scales: {
-                            y: {
-                                beginAtZero: true,
-                                max: 100,
-                                ticks: {
-                                    callback: function (value) {
-                                        return value + '%';
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    });
-                  {% endif %}
-
-                  {% if yearly_data %}
-
-      // Annual Income Sources Chart
-      const yearlyIncomeSourcesCtx = document.getElementById('yearlyIncomeSourcesChart').getContext('2d');
-      new Chart(yearlyIncomeSourcesCtx, {
-        type: 'pie',
-        data: {
-          labels: {{ yearly_income_labels | tojson }},
-          datasets: [{
-            data: {{ yearly_income_amounts | tojson }},
-            backgroundColor: [
-              '#7c3aed', '#a855f7', '#c084fc', '#d8b4fe', '#e9d5ff', '#f3e8ff'
-            ]
-          }]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: {
-            legend: {
-              position: 'bottom',
-              labels: { padding: 20, usePointStyle: true }
-            },
-            tooltip: {
-              callbacks: {
-                label: function(context) {
-                  const label = context.label || '';
-                  const value = context.parsed;
-                  const total = context.dataset.data.reduce((a, b) => a + b, 0);
-                  const percentage = ((value / total) * 100).toFixed(1);
-                  return label + ': ' + value.toLocaleString() + 'kr (' + percentage + '%)';
-                }
-              }
-            }
-          }
-        }
-      });
-
-      // Annual Category Spending Chart
-      const yearlyCategorySpendingCtx = document.getElementById('yearlyCategorySpendingChart').getContext('2d');
-      new Chart(yearlyCategorySpendingCtx, {
-        type: 'pie',
-        data: {
-          labels: {{ yearly_category_labels | tojson }},
-          datasets: [{
-            data: {{ yearly_category_amounts | tojson }},
-            backgroundColor: [
-              '#667eea', '#764ba2', '#f093fb', '#f5576c', '#4facfe', '#43e97b',
-              '#fa709a', '#fee140', '#a8edea', '#d299c2', '#ffd89b', '#19547b'
-            ]
-          }]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: {
-            legend: {
-              position: 'bottom',
-              labels: { padding: 20, usePointStyle: true }
-            },
-            tooltip: {
-              callbacks: {
-                label: function(context) {
-                  const label = context.label || '';
-                  const value = context.parsed;
-                  const total = context.dataset.data.reduce((a, b) => a + b, 0);
-                  const percentage = ((value / total) * 100).toFixed(1);
-                  return label + ': ' + value.toLocaleString() + 'kr (' + percentage + '%)';
-                }
-              }
-            }
-          }
-        }
-      });
-
-      // Annual Spending Types Chart
-      const yearlySpendingTypesCtx = document.getElementById('yearlySpendingTypesChart').getContext('2d');
-      new Chart(yearlySpendingTypesCtx, {
-        type: 'doughnut',
-        data: {
-          labels: ['Discretionary', 'Non-Discretionary', 'Debt', 'Savings'],
-          datasets: [{
-            data: [{{ yearly_discretionary }}, {{ yearly_non_discretionary }}, {{ yearly_debt }}, {{ yearly_savings }}],
-            backgroundColor: ['#f59e0b', '#3b82f6', '#dc2626', '#10b981'],
-            borderWidth: 0
-          }]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: {
-            legend: {
-              position: 'bottom',
-              labels: { padding: 20, usePointStyle: true }
-            },
-            tooltip: {
-              callbacks: {
-                label: function(context) {
-                  const label = context.label || '';
-                  const value = context.parsed;
-                  const total = context.dataset.data.reduce((a, b) => a + b, 0);
-                  const percentage = ((value / total) * 100).toFixed(1);
-                  return label + ': ' + value.toLocaleString() + 'kr (' + percentage + '%)';
-                }
-              }
-            }
-          }
-        }
-      });
-
-      // Monthly Cash Flow Chart
-      const monthlyCashFlowCtx = document.getElementById('monthlyCashFlowChart').getContext('2d');
-      new Chart(monthlyCashFlowCtx, {
-        type: 'line',
-        data: {
-          labels: {{ monthly_labels | tojson }},
-          datasets: [
-            {
-              label: 'Income',
-              data: {{ monthly_income_progression | tojson }},
-              borderColor: '#10b981',
-              backgroundColor: 'rgba(16, 185, 129, 0.1)',
-              fill: true,
-              tension: 0.4
-            },
-            {
-              label: 'Expenses',
-              data: {{ monthly_expenses_progression | tojson }},
-              borderColor: '#dc2626',
-              backgroundColor: 'rgba(220, 38, 38, 0.1)',
-              fill: true,
-              tension: 0.4
-            },
-            {
-              label: 'Net Flow',
-              data: {{ monthly_net_flow_progression | tojson }},
-              borderColor: '#7c3aed',
-              backgroundColor: 'rgba(124, 58, 237, 0.1)',
-              fill: true,
-              tension: 0.4
-            }
-          ]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: {
-            legend: { position: 'top' }
-          },
-          scales: {
-            y: {
-              beginAtZero: true,
-              ticks: {
-                callback: function(value) {
-                  return value.toLocaleString() + 'kr';
-                }
-              }
-            }
-          }
-        }
-      });
-
-      // Monthly Percentage Trends Chart
-      const monthlyPercentageCtx = document.getElementById('monthlyPercentageChart').getContext('2d');
-      new Chart(monthlyPercentageCtx, {
-        type: 'line',
-        data: {
-          labels: {{ monthly_labels | tojson }},
-          datasets: [
-            {
-              label: 'Discretionary %',
-              data: {{ monthly_discretionary_pct | tojson }},
-              borderColor: '#f59e0b',
-              backgroundColor: 'rgba(245, 158, 11, 0.1)',
-              fill: true,
-              tension: 0.4
-            },
-            {
-              label: 'Non-Discretionary %',
-              data: {{ monthly_non_discretionary_pct | tojson }},
-              borderColor: '#3b82f6',
-              backgroundColor: 'rgba(59, 130, 246, 0.1)',
-              fill: true,
-              tension: 0.4
-            },
-            {
-              label: 'Savings %',
-              data: {{ monthly_savings_pct | tojson }},
-              borderColor: '#10b981',
-              backgroundColor: 'rgba(16, 185, 129, 0.1)',
-              fill: true,
-              tension: 0.4
-            },
-            {
-              label: 'Debt %',
-              data: {{ monthly_debt_pct | tojson }},
-              borderColor: '#dc2626',
-              backgroundColor: 'rgba(220, 38, 38, 0.1)',
-              fill: true,
-              tension: 0.4
-            }
-          ]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: {
-            legend: { position: 'top' }
-          },
-          scales: {
-            y: {
-              beginAtZero: true,
-              max: 100,
-              ticks: {
-                callback: function(value) {
-                  return value + '%';
-                }
-              }
-            }
-          }
-        }
-      });
-
-      // Category Trends Chart
-      const categoryTrendsCtx = document.getElementById('categoryTrendsChart').getContext('2d');
-      new Chart(categoryTrendsCtx, {
-        type: 'line',
-        data: {
-          labels: {{ monthly_labels | tojson }},
-          datasets: {{ category_trends_datasets | tojson }}
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: {
-            legend: { position: 'top' }
-          },
-          scales: {
-            y: {
-              beginAtZero: true,
-              ticks: {
-                callback: function(value) {
-                  return value.toLocaleString() + 'kr';
-                }
-              }
-            }
-          }
-        }
-      });
-
-      {% endif %}
-    </script>
   </body>
 </html>

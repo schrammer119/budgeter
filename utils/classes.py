@@ -81,6 +81,10 @@ class GeneralConfig:
     log_level: str = "INFO"
     log_file: str = LOG_FILE_PATH
 
+    # charts
+    spending_type_chart: str = "data/spending_type_chart.png",
+    category_spending_chart: str = "data/spending_type_chart.png"
+
 
 @dataclass
 class CredentialsConfig:
