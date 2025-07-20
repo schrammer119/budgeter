@@ -206,37 +206,6 @@
         color: #2c3e50;
       }
 
-      .insight-box {
-        background-color: #f8f9fa;
-        border-left: 3px solid #3498db;
-        padding: 10px;
-        margin: 10px 0;
-      }
-
-      .insight-box.warning {
-        border-left-color: #f39c12;
-      }
-
-      .insight-box.success {
-        border-left-color: #27ae60;
-      }
-
-      .insight-box h4 {
-        margin: 0 0 5px 0;
-        font-size: 14px;
-        color: #2c3e50;
-      }
-
-      .insight-box ul {
-        margin: 0;
-        padding-left: 15px;
-      }
-
-      .insight-box li {
-        font-size: 12px;
-        margin-bottom: 3px;
-      }
-
       .chart-container {
         width: 100%;
         margin: 15px 0;
@@ -553,35 +522,6 @@
           </tbody>
         </table>
 
-        <!-- Insights -->
-        {% if quarterly_achievements %}
-        <div class="insight-box success">
-          <h4>Achievements</h4>
-          <ul>
-            {% for achievement in quarterly_achievements %}
-            <li>{{ achievement }}</li>
-            {% endfor %}
-          </ul>
-        </div>
-        {% endif %} {% if quarterly_concerns %}
-        <div class="insight-box warning">
-          <h4>Areas of Concern</h4>
-          <ul>
-            {% for concern in quarterly_concerns %}
-            <li>{{ concern }}</li>
-            {% endfor %}
-          </ul>
-        </div>
-        {% endif %} {% if quarterly_recommendations %}
-        <div class="insight-box">
-          <h4>Recommendations</h4>
-          <ul>
-            {% for recommendation in quarterly_recommendations %}
-            <li>{{ recommendation }}</li>
-            {% endfor %}
-          </ul>
-        </div>
-        {% endif %}
       </div>
       {% endif %}
 

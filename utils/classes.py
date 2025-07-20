@@ -21,6 +21,7 @@ class Transaction:
     transaction_id: str
     category: Optional[str] = None
     merchant: Optional[str] = None
+    match_score: Optional[float] = None
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert transaction to dictionary for JSON serialization."""
@@ -31,7 +32,8 @@ class Transaction:
             'account_id': self.account_id,
             'transaction_id': self.transaction_id,
             'category': self.category,
-            'merchant': self.merchant
+            'merchant': self.merchant,
+            'match_score': self.match_score
         }
 
     @classmethod
@@ -44,7 +46,8 @@ class Transaction:
             account_id=data['account_id'],
             transaction_id=data['transaction_id'],
             category=data.get('category'),
-            merchant=data.get('merchant')
+            merchant=data.get('merchant'),
+            match_score=data.get('match_score')
         )
 
 
@@ -84,6 +87,9 @@ class GeneralConfig:
     # charts
     spending_type_chart: str = "data/spending_type_chart.png",
     category_spending_chart: str = "data/spending_type_chart.png"
+
+    # transactions log
+    transactions_log_format: str = "transactions/{}_transactions_log.xlsx"
 
 
 @dataclass

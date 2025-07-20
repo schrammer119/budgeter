@@ -8,6 +8,8 @@ __pycache__
 /logs
 /input
 /processed
+/reports
+/transactions
 .env
 
 # personal settings

@@ -22,6 +22,7 @@ from utils.fileHandler import FileHandler
 from collections import defaultdict
 from datetime import date, datetime, timedelta
 from dateutil.relativedelta import relativedelta
+from email.mime.application import MIMEApplication
 from email.mime.image import MIMEImage
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -36,12 +37,15 @@ import minify_html
 import numpy as np
 import os
 import re
+import pandas as pd
 import smtplib
 import sys
 
 os.makedirs('logs', exist_ok=True)
 os.makedirs('data', exist_ok=True)
 os.makedirs('config', exist_ok=True)
+os.makedirs('reports', exist_ok=True)
+os.makedirs('transactions', exist_ok=True)
 
 
 def setup_logger():
@@ -156,6 +160,9 @@ class BudgetAnalyzer:
         for tx in transactions:
             if tx.category:
                 continue  # Already categorized
+
+            scored_list = []
+
             norm = self._normalize(tx.description)
 
             # Rule-based early categorization
@@ -164,21 +171,15 @@ class BudgetAnalyzer:
                 if len(token_norm) > len(norm):
                     continue
                 if token_norm in norm:
-                    tx.category = category
-                    tx.merchant = token
+                    scored_list.append((category, token, 95.0))
                     break
-            if tx.category:
-                continue  # Already categorized
 
             # Regex patterns
             for pattern, category, name in MERCHANT_REGEXES:
                 match = re.search(pattern, norm)
                 if match:
-                    tx.category = category
-                    tx.merchant = name
+                    scored_list.append((category, name, 94.0))
                     break
-            if tx.category:
-                continue  # Already categorized
 
             # Fuzzy matching
             normalized_to_original = {
@@ -186,28 +187,24 @@ class BudgetAnalyzer:
             normalized_keys = [
                 k for k in normalized_to_original.keys() if len(k) <= len(norm)]
 
-            if not normalized_keys:
-                if tx.amount > 0:
-                    tx.category = "Uncategorized Income"
-                else:
-                    tx.category = "Uncategorized"
-                tx.merchant = tx.description
-                continue
-
             match_list = process.extract(
                 norm, normalized_keys, scorer=fuzz.partial_ratio)
-            best_norm, score, _ = max(
-                match_list, key=lambda x: (x[1], len(x[0])))
-            best = normalized_to_original[best_norm]
-            if score >= self.cfg.general.category_threshold:
-                tx.category = MERCHANT_CATEGORIES[best]
-                tx.merchant = best
-            else:
+            for merchant, score, _ in match_list:
+                scored_list.append(
+                    (MERCHANT_CATEGORIES[normalized_to_original[merchant]], merchant, score))
+            scored_list.sort(key=lambda x: x[2], reverse=True)
+
+            if not scored_list or scored_list[0][2] < self.cfg.general.category_threshold:
                 if tx.amount > 0:
                     tx.category = "Uncategorized Income"
                 else:
                     tx.category = "Uncategorized"
                 tx.merchant = tx.description
+                tx.match_score = 0
+            else:
+                tx.category = scored_list[0][0]
+                tx.merchant = scored_list[0][1]
+                tx.match_score = scored_list[0][2]
 
     def _calculate_expense_volatility(self, monthly_expenses):
         """Calculate expense volatility as coefficient of variation"""
@@ -462,6 +459,12 @@ class BudgetAnalyzer:
         # Get transactions for both periods
         transactions = self.db.get_transactions(month_start, month_end)
         self._categorize_transactions(transactions)
+
+        # write to a transactions log for the current month
+        dicts = [tx.to_dict() for tx in transactions]
+        df = pd.DataFrame(dicts)
+        df.to_excel(self.cfg.general.transactions_log_format.format(
+            target_month.strftime("%Y%m")), index=False)
 
         # Initialize calculations
         total_income = 0.0
@@ -746,152 +749,6 @@ class BudgetAnalyzer:
         yoy_debt_change = quarterly_debt_pct - prev_quarterly_debt_pct
         yoy_savings_change = quarterly_savings_pct - prev_quarterly_savings_pct
 
-        # Category YoY changes
-        category_changes = []
-        for category, current_amount in category_totals.items():
-            previous_amount = prev_category_totals.get(category, 0)
-            if previous_amount > 0:
-                change_percent = (
-                    (current_amount - previous_amount) / previous_amount) * 100
-                category_changes.append({
-                    'category': category,
-                    'change_percent': change_percent,
-                    'current_amount': current_amount,
-                    'previous_amount': previous_amount
-                })
-
-        # Sort by absolute change and return top 10
-        category_changes .sort(key=lambda x: abs(
-            x['change_percent']), reverse=True)
-        category_changes = category_changes[:10]
-
-        # category volatility
-        category_volatility = {}
-
-        # Group expenses by category across months
-        for month in monthly_categories:
-            for category, amount in month.items():
-                if category not in category_volatility:
-                    category_volatility[category] = []
-                category_volatility[category].append(amount)
-
-        # Calculate volatility score for each category
-        volatility_analysis = []
-        for category, amounts in category_volatility.items():
-            if len(amounts) < 2:
-                volatility_score = 0
-            else:
-                mean_amount = sum(amounts) / len(amounts)
-                if mean_amount == 0:
-                    volatility_score = 0
-                else:
-                    variance = sum((x - mean_amount) **
-                                   2 for x in amounts) / len(amounts)
-                    std_dev = variance ** 0.5
-                    coefficient_of_variation = (std_dev / mean_amount) * 100
-                    volatility_score = min(coefficient_of_variation, 100)
-
-            volatility_analysis.append({
-                'category': category,
-                'volatility_score': volatility_score,
-                'mean_amount': mean_amount
-            })
-
-        # Sort by volatility score and return top 10
-        volatility_analysis.sort(
-            key=lambda x: x['volatility_score'], reverse=True)
-        volatility_analysis = volatility_analysis[:10]
-
-        # achievements
-        achievements = []
-
-        if quarterly_savings_pct >= 20:
-            achievements.append(
-                f"Maintained excellent savings rate of {quarterly_savings_pct:.1f}%")
-        elif quarterly_savings_pct > prev_quarterly_savings_pct:
-            achievements.append(
-                f"Improved savings rate by {quarterly_savings_pct - prev_quarterly_savings_pct:.1f} percentage points")
-
-        # Check for consistent positive cash flow
-        positive_months = sum(1 for x in monthly_cashflows if x > 0)
-        if positive_months == 3:
-            achievements.append("Achieved positive cash flow in all months")
-        elif positive_months > 1:
-            achievements.append(
-                f"Maintained positive cash flow in {positive_months} out of 3 months")
-
-        # Check for reduced discretionary spending
-        if quarterly_discretionary < prev_quarterly_discretionary:
-            reduction = ((prev_quarterly_discretionary -
-                         quarterly_discretionary) / prev_quarterly_discretionary) * 100
-            achievements.append(
-                f"Reduced discretionary spending by {reduction:.1f}% compared to last year")
-
-        quarterly_achievements = achievements if achievements else [
-            "Completed financial tracking for the quarter"]
-
-        # concerns
-        quarterly_concerns = []
-
-        if quarterly_savings_pct < 10:
-            quarterly_concerns.append(
-                f"Savings rate of {quarterly_savings_pct:.1f}% is below recommended 20%")
-
-        # Check for high expense volatility
-        volatility = self._calculate_expense_volatility(monthly_expenses)
-        if volatility > 20:
-            quarterly_concerns.append(
-                f"High expense volatility ({volatility:.1f}%) indicates inconsistent spending")
-
-        # Check for increasing debt burden
-        if quarterly_debt_pct > 30:
-            quarterly_concerns.append(
-                f"Debt burden of {quarterly_debt_pct:.1f}% exceeds recommended 30%")
-
-        # Check for negative cash flow months
-        negative_months = sum(1 for x in monthly_cashflows if x < 0)
-        if negative_months == 3:
-            quarterly_concerns.append(
-                "Experienced negative cash flow in all months")
-        elif negative_months > 1:
-            quarterly_concerns.append(
-                f"Experienced negative cash flow in {negative_months} out of 3 months")
-
-        # recommendations
-        recommendations = []
-
-        # Recommendations based on category changes
-        if category_changes:
-            top_increase = max(
-                category_changes, key=lambda x: x['change_percent'])
-            if top_increase['change_percent'] > 20:
-                recommendations.append(
-                    f"Consider reviewing {top_increase['category']} spending - increased by {top_increase['change_percent']:.1f}%")
-
-        # Recommendations based on volatility
-        if volatility_analysis:
-            most_volatile = volatility_analysis[0]
-            if most_volatile['volatility_score'] > 30:
-                recommendations.append(
-                    f"Create a budget for {most_volatile['category']} to reduce spending volatility")
-
-        # Savings rate recommendations
-        if quarterly_savings_pct < 20:
-            recommendations.append(
-                "Consider increasing automating savings transfers to improve consistency")
-            recommendations.append(
-                "Review discretionary spending categories for potential cuts")
-
-        # Cash flow recommendations
-        if negative_months > 0:
-            recommendations.append(
-                "Build an emergency fund to handle irregular expenses")
-            recommendations.append(
-                "Consider income diversification or expense reduction strategies")
-
-        quarterly_recommendations = recommendations if recommendations else [
-            "Continue monitoring spending patterns and maintain current financial discipline"]
-
         return {
             # Basic info
             'quarter': quarter_num,
@@ -923,12 +780,7 @@ class BudgetAnalyzer:
                 prev_quarterly_non_discretionary,
                 prev_quarterly_debt,
                 prev_quarterly_savings,
-            ],
-
-            # Insights
-            'quarterly_achievements': quarterly_achievements,
-            'quarterly_concerns': quarterly_concerns,
-            'quarterly_recommendations': quarterly_recommendations,
+            ]
         }
 
     def _get_yearly_data(self, target_month: date) -> Dict[str, Any]:
@@ -1199,7 +1051,7 @@ class BudgetAnalyzer:
                 f"Failed to render template {template_name}: {e}", exc_info=True)
             return None
 
-    def send_email_report(self, html_content: str, subject: str) -> bool:
+    def send_email_report(self, html_content: str, subject: str, target_month: date) -> bool:
         """Send email report with error handling."""
         try:
             msg = MIMEMultipart("alternative")
@@ -1228,6 +1080,13 @@ class BudgetAnalyzer:
                 mime_img.add_header(
                     "Content-Disposition", "inline", filename=Path(self.cfg.general.category_spending_chart).name)
                 msg.attach(mime_img)
+
+            tx_file = Path(self.cfg.general.transactions_log_format.format(
+                target_month.strftime("%Y%m")))
+            with open(tx_file, "rb") as file:
+                part = MIMEApplication(file.read(), Name=tx_file.name)
+                part['Content-Disposition'] = f'attachment; filename="{tx_file.name}"'
+                msg.attach(part)
 
             with smtplib.SMTP(self.cfg.general.smtp_server, self.cfg.general.smtp_port) as server:
                 server.starttls()
@@ -1277,7 +1136,7 @@ class BudgetAnalyzer:
 
             if html_report:
                 # Save report to file
-                fname = f"data/{target_month.strftime('%Y_%m')}_{report_type}_report.html"
+                fname = f"reports/{target_month.strftime('%Y_%m')}_{report_type}_report.html"
                 with open(fname, "w", encoding="utf-8") as f:
                     f.write(html_report)
                 logger.info(f"Report saved to {fname}")
@@ -1286,7 +1145,7 @@ class BudgetAnalyzer:
                 if send_email:
                     subject = f"{report_type.title()} Budget Report, {target_month.strftime('%B %Y')}"
                     results["email_sent"] = self.send_email_report(
-                        html_report, subject)
+                        html_report, subject, target_month)
 
             return results
 
