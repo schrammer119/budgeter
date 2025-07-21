@@ -3,9 +3,9 @@ import logging
 from dataclasses import dataclass, field, asdict
 from datetime import date, datetime
 from pathlib import Path
-from typing import Dict, Optional, Any, List
+from typing import Dict, Optional, Any, List, Tuple
 
-__version__ = "0.0.4"
+__version__ = "1.0.0"
 LOG_FILE_PATH = "logs/budget_analyzer.log"
 
 logger = logging.getLogger(__name__)
@@ -48,6 +48,48 @@ class Transaction:
             category=data.get('category'),
             merchant=data.get('merchant'),
             match_score=data.get('match_score')
+        )
+
+
+@dataclass
+class CategorizationConfig:
+    """Configuration for transaction categorization rules."""
+
+    _comment: str = ""
+
+    # Exact token matches (100% confidence)
+    merchant_tokens: Dict[str, str] = field(default_factory=dict)
+
+    # Regex patterns with categories and display names
+    # Stored as list of [pattern, category, display_name] for JSON compatibility
+    merchant_regexes: List[List[str]] = field(default_factory=list)
+
+    # Fuzzy matching merchant categories
+    merchant_categories: Dict[str, str] = field(default_factory=dict)
+
+    # Category type mappings
+    category_types: Dict[str, str] = field(default_factory=dict)
+
+    def get_merchant_regex_tuples(self) -> List[Tuple[str, str, str]]:
+        """Convert regex list format to tuple format for use in code."""
+        return [(pattern, category, display) for pattern, category, display in self.merchant_regexes]
+
+    @classmethod
+    def get_default_config(cls) -> 'CategorizationConfig':
+        """Create default categorization configuration."""
+        return cls(
+            merchant_tokens={
+                "Example Token": "Uncategorized",
+            },
+            merchant_regexes=[
+                ["\\bExample Token\\b", "Uncategorized", "Example Token"],
+            ],
+            merchant_categories={
+                "Example Token": "Uncategorized",
+            },
+            category_types={
+                "Uncategorized": "Discretionary",
+            }
         )
 
 
@@ -116,6 +158,7 @@ class Config:
     """Combined configuration for the budget analyzer."""
     general: GeneralConfig
     credentials: CredentialsConfig
+    categorization: CategorizationConfig
 
     @staticmethod
     def load(config_dir: str = "config") -> "Config":
@@ -123,6 +166,7 @@ class Config:
         config_path = Path(config_dir)
         general_file = config_path / "general.json"
         credentials_file = config_path / "credentials.json"
+        categorization_file = config_path / "categorization.json"
 
         # Create config directory if it doesn't exist
         config_path.mkdir(exist_ok=True)
@@ -169,6 +213,29 @@ class Config:
             Config._save_credentials_config(
                 credentials_config, credentials_file)
 
+        # Load or create categorization config
+        if categorization_file.exists():
+            try:
+                with open(categorization_file, "r", encoding="utf-8") as f:
+                    categorization_data = json.load(f)
+                categorization_config = CategorizationConfig(
+                    **categorization_data)
+                logger.info(
+                    f"Categorization configuration loaded from {categorization_file}")
+            except (json.JSONDecodeError, TypeError) as e:
+                logger.error(
+                    f"Invalid JSON in categorization configuration file: {e}")
+                logger.info("Creating new categorization configuration file")
+                categorization_config = CategorizationConfig.get_default_config()
+                Config._save_categorization_config(
+                    categorization_config, categorization_file)
+        else:
+            logger.info(
+                f"Categorization configuration file not found, creating {categorization_file}")
+            categorization_config = CategorizationConfig.get_default_config()
+            Config._save_categorization_config(
+                categorization_config, categorization_file)
+
         # Check if email credentials need to be configured
         if (credentials_config.smtp_user == "your_email@gmail.com" or
                 credentials_config.smtp_password == "your_app_password_here"):
@@ -177,7 +244,11 @@ class Config:
             logger.warning(
                 f"Please edit {credentials_file} with your actual email credentials for report sending")
 
-        return Config(general=general_config, credentials=credentials_config)
+        return Config(
+            general=general_config,
+            credentials=credentials_config,
+            categorization=categorization_config
+        )
 
     @staticmethod
     def _save_general_config(config: GeneralConfig, file_path: Path):
@@ -223,13 +294,42 @@ class Config:
             logger.error(f"Failed to save credentials configuration: {e}")
             raise
 
+    @staticmethod
+    def _save_categorization_config(config: CategorizationConfig, file_path: Path):
+        """Save categorization configuration to file."""
+        try:
+            config_dict = asdict(config)
+
+            # Add comments to the JSON for better user experience
+            config_with_comments = {
+                "_comment": [
+                    "Transaction categorization rules configuration",
+                    "merchant_tokens: Exact matches for transaction descriptions (100% confidence)",
+                    "merchant_regexes: Regular expression patterns [pattern, category, display_name]",
+                    "merchant_categories: Fuzzy matching for merchant names",
+                    "category_types: Maps categories to spending types (Discretionary, Non-Discretionary, etc.)"
+                ],
+                **config_dict
+            }
+
+            with open(file_path, "w", encoding="utf-8") as f:
+                json.dump(config_with_comments, f,
+                          indent=2, ensure_ascii=False)
+            logger.info(f"Categorization configuration saved to {file_path}")
+        except Exception as e:
+            logger.error(f"Failed to save categorization configuration: {e}")
+            raise
+
     def save(self, config_dir: str = "config"):
-        """Save both configuration files."""
+        """Save all configuration files."""
         config_path = Path(config_dir)
         config_path.mkdir(exist_ok=True)
 
         general_file = config_path / "general.json"
         credentials_file = config_path / "credentials.json"
+        categorization_file = config_path / "categorization.json"
 
         self._save_general_config(self.general, general_file)
         self._save_credentials_config(self.credentials, credentials_file)
+        self._save_categorization_config(
+            self.categorization, categorization_file)

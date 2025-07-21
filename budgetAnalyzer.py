@@ -10,10 +10,6 @@ Author: Alexander Schramm
 License: MIT
 """
 
-from config.macros import (MERCHANT_TOKENS,
-                           MERCHANT_REGEXES,
-                           MERCHANT_CATEGORIES,
-                           CATEGORY_TYPES)
 from utils.classes import (Transaction,
                            Config,
                            LOG_FILE_PATH)
@@ -166,7 +162,7 @@ class BudgetAnalyzer:
             norm = self._normalize(tx.description)
 
             # Rule-based early categorization
-            for token, category in MERCHANT_TOKENS.items():
+            for token, category in self.cfg.categorization.merchant_tokens.items():
                 token_norm = self._normalize(token)
                 if len(token_norm) > len(norm):
                     continue
@@ -175,7 +171,7 @@ class BudgetAnalyzer:
                     break
 
             # Regex patterns
-            for pattern, category, name in MERCHANT_REGEXES:
+            for pattern, category, name in self.cfg.categorization.get_merchant_regex_tuples():
                 match = re.search(pattern, norm)
                 if match:
                     scored_list.append((category, name, 94.0))
@@ -183,7 +179,7 @@ class BudgetAnalyzer:
 
             # Fuzzy matching
             normalized_to_original = {
-                self._normalize(k): k for k in MERCHANT_CATEGORIES.keys()}
+                self._normalize(k): k for k in self.cfg.categorization.merchant_categories.keys()}
             normalized_keys = [
                 k for k in normalized_to_original.keys() if len(k) <= len(norm)]
 
@@ -191,7 +187,7 @@ class BudgetAnalyzer:
                 norm, normalized_keys, scorer=fuzz.partial_ratio)
             for merchant, score, _ in match_list:
                 scored_list.append(
-                    (MERCHANT_CATEGORIES[normalized_to_original[merchant]], merchant, score))
+                    (self.cfg.categorization.merchant_categories[normalized_to_original[merchant]], merchant, score))
             scored_list.sort(key=lambda x: x[2], reverse=True)
 
             if not scored_list or scored_list[0][2] < self.cfg.general.category_threshold:
@@ -509,7 +505,7 @@ class BudgetAnalyzer:
         unknown_spending = 0.0
 
         for category, amount in category_totals.items():
-            category_type = CATEGORY_TYPES.get(
+            category_type = self.cfg.categorization.category_types.get(
                 category, 'Unkown')
             if category_type == 'Discretionary':
                 discretionary_spending += amount
@@ -542,7 +538,7 @@ class BudgetAnalyzer:
                 'amount': amount,
                 'percentage_of_expenses': (amount / total_expenses * 100) if total_expenses > 0 else 0,
                 'percentage_of_income': (amount / total_income * 100) if total_income > 0 else 0,
-                'type': CATEGORY_TYPES.get(category, 'Discretionary'),
+                'type': self.cfg.categorization.category_types.get(category, 'Discretionary'),
                 'transactions': category_transactions[category]
             })
 
@@ -659,7 +655,7 @@ class BudgetAnalyzer:
         q_unknown_spending = 0.0
 
         for category, amount in category_totals.items():
-            category_type = CATEGORY_TYPES.get(
+            category_type = self.cfg.categorization.category_types.get(
                 category, 'Unkown')
             if category_type == 'Discretionary':
                 quarterly_discretionary += amount
@@ -712,7 +708,7 @@ class BudgetAnalyzer:
         prev_q_unknown_spending = 0.0
 
         for category, amount in prev_category_totals.items():
-            category_type = CATEGORY_TYPES.get(
+            category_type = self.cfg.categorization.category_types.get(
                 category, 'Unkown')
             if category_type == 'Discretionary':
                 prev_quarterly_discretionary += amount
@@ -834,7 +830,8 @@ class BudgetAnalyzer:
                 yearly_expenses += expense_amount
                 monthly_expenses[month_index] += expense_amount
 
-                category_type = CATEGORY_TYPES.get(category, 'Unkown')
+                category_type = self.cfg.categorization.category_types.get(
+                    category, 'Unkown')
                 if category_type == 'Discretionary':
                     monthly_discretionary[month_index] += expense_amount
                 elif category_type == 'Non-Discretionary':
@@ -863,7 +860,7 @@ class BudgetAnalyzer:
         y_unknown_spending = 0.0
 
         for category, amount in category_totals.items():
-            category_type = CATEGORY_TYPES.get(
+            category_type = self.cfg.categorization.category_types.get(
                 category, 'Unkown')
             if category_type == 'Discretionary':
                 yearly_discretionary += amount
@@ -1093,7 +1090,7 @@ class BudgetAnalyzer:
                 server.login(self.cfg.credentials.smtp_user,
                              self.cfg.credentials.smtp_password)
                 server.send_message(
-                    msg, to_addrs=self.cfg.credentials.email_from)
+                    msg, to_addrs=self.cfg.credentials.email_to)
 
             logger.info("Email report sent successfully")
             return True
@@ -1159,6 +1156,65 @@ class BudgetAnalyzer:
                 "email_sent": False
             }
 
+    def check_categorization(
+        self,
+        target_month: date
+    ) -> Dict[str, Any]:
+        """
+        Import new files, categorize transactions, and save to Excel log for review.
+
+        Args:
+            target_month: Target month for transaction processing
+
+        Returns:
+            Dictionary with processing results
+        """
+        try:
+            # Import bank statement files
+            self.import_new_files()
+
+            # Get date range for the target month
+            month_start, month_end = self._get_date_range(target_month)
+
+            # Get transactions for the period
+            transactions = self.db.get_transactions(month_start, month_end)
+
+            # Categorize transactions
+            self._categorize_transactions(transactions)
+
+            # Save to Excel log for review
+            dicts = [tx.to_dict() for tx in transactions]
+            df = pd.DataFrame(dicts)
+            excel_file = self.cfg.general.transactions_log_format.format(
+                target_month.strftime("%Y%m"))
+            df.to_excel(excel_file, index=False)
+
+            logger.info(f"Processed {len(transactions)} transactions")
+            logger.info(f"Categorized transactions saved to: {excel_file}")
+
+            # Summary of categorization results
+            uncategorized = [tx for tx in transactions if tx.category in [
+                'Uncategorized', 'Uncategorized Income']]
+            low_confidence = [tx for tx in transactions if hasattr(
+                tx, 'match_score') and tx.match_score < 80 and tx.match_score > 0]
+
+            return {
+                "success": True,
+                "total_transactions": len(transactions),
+                "uncategorized_count": len(uncategorized),
+                "low_confidence_count": len(low_confidence),
+                "excel_file": excel_file,
+                "uncategorized_transactions": [tx.description for tx in uncategorized],
+                "low_confidence_transactions": [(tx.description, getattr(tx, 'match_score', 0)) for tx in low_confidence]
+            }
+
+        except Exception as e:
+            logger.error(f"Categorization check failed: {e}", exc_info=True)
+            return {
+                "success": False,
+                "error": str(e)
+            }
+
 
 def main():
     """Main entry point for the budget analyzer."""
@@ -1172,6 +1228,8 @@ def main():
                         help="Don't send email report")
     parser.add_argument(
         "--target-month", help="Target month in YYYY-MM format")
+    parser.add_argument("--check-categorization", action="store_true",
+                        help="Import files, categorize transactions, and save to Excel for review")
 
     args = parser.parse_args()
 
@@ -1217,6 +1275,41 @@ def main():
             if target_month.day < 25:
                 target_month -= relativedelta(months=1)
             target_month = target_month.replace(day=1)
+
+        if args.check_categorization:
+            results = analyzer.check_categorization(target_month)
+
+            if results["success"]:
+                print(
+                    f"✓ Processed {results['total_transactions']} transactions")
+                print(f"✓ Saved to: {results['excel_file']}")
+
+                if results['uncategorized_count'] > 0:
+                    print(
+                        f"⚠ {results['uncategorized_count']} uncategorized transactions:")
+                    for desc in results['uncategorized_transactions'][:5]:  # Show first 5
+                        print(f"  - {desc}")
+                    if results['uncategorized_count'] > 5:
+                        print(
+                            f"  ... and {results['uncategorized_count'] - 5} more")
+
+                if results['low_confidence_count'] > 0:
+                    print(
+                        f"⚠ {results['low_confidence_count']} low confidence matches:")
+                    # Show first 5
+                    for desc, score in results['low_confidence_transactions'][:5]:
+                        print(f"  - {desc} (score: {score:.1f})")
+                    if results['low_confidence_count'] > 5:
+                        print(
+                            f"  ... and {results['low_confidence_count'] - 5} more")
+
+                if results['uncategorized_count'] == 0 and results['low_confidence_count'] == 0:
+                    print("✓ All transactions categorized successfully!")
+
+            else:
+                print(f"✗ Categorization check failed: {results['error']}")
+
+            return
 
         # report type
         if args.report_type:
