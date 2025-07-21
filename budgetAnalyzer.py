@@ -501,7 +501,7 @@ class BudgetAnalyzer:
         discretionary_spending = 0.0
         non_discretionary_spending = 0.0
         debt_payments = 0.0
-        total_savings = 0.0
+        total_savings = net_cash_flow
         unknown_spending = 0.0
 
         for category, amount in category_totals.items():
@@ -527,8 +527,6 @@ class BudgetAnalyzer:
                            100) if total_income > 0 else 0
         savings_rate = (total_savings / total_income *
                         100) if total_income > 0 else 0
-        # Only positive cash flow counts as savings
-        savings_amount = total_savings
 
         # Build category breakdown
         category_breakdown = []
@@ -569,7 +567,7 @@ class BudgetAnalyzer:
             'total_expenses': round(total_expenses, 0),
             'net_cash_flow': round(net_cash_flow, 0),
             'savings_rate': round(savings_rate, 1),
-            'savings_amount': round(savings_amount, 0),
+            'savings_amount': round(total_savings, 0),
             'discretionary_spending': round(discretionary_spending, 0),
             'discretionary_percentage': round(discretionary_percentage, 1),
             'non_discretionary_spending': round(non_discretionary_spending, 0),
@@ -651,7 +649,7 @@ class BudgetAnalyzer:
         quarterly_discretionary = 0.0
         quarterly_non_discretionary = 0.0
         quarterly_debt = 0.0
-        quarterly_savings = 0.0
+        quarterly_savings = quarterly_net_flow
         q_unknown_spending = 0.0
 
         for category, amount in category_totals.items():
@@ -704,7 +702,7 @@ class BudgetAnalyzer:
         prev_quarterly_discretionary = 0.0
         prev_quarterly_non_discretionary = 0.0
         prev_quarterly_debt = 0.0
-        prev_quarterly_savings = 0.0
+        prev_quarterly_savings = prev_quarterly_net_flow
         prev_q_unknown_spending = 0.0
 
         for category, amount in prev_category_totals.items():
@@ -844,6 +842,9 @@ class BudgetAnalyzer:
                 category_totals[category] += expense_amount
                 monthly_categories[category][month_index] += expense_amount
 
+        monthly_savings = [
+            s + i - e for s, i, e in zip(monthly_savings, monthly_income, monthly_expenses)]
+
         category_totals = dict(
             sorted(category_totals.items(), key=lambda item: item[1], reverse=True))
         income_sources = dict(
@@ -856,7 +857,7 @@ class BudgetAnalyzer:
         yearly_discretionary = 0.0
         yearly_non_discretionary = 0.0
         yearly_debt = 0.0
-        yearly_savings = 0.0
+        yearly_savings = yearly_net_flow
         y_unknown_spending = 0.0
 
         for category, amount in category_totals.items():
