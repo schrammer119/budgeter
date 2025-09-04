@@ -1049,7 +1049,7 @@ class BudgetAnalyzer:
                 f"Failed to render template {template_name}: {e}", exc_info=True)
             return None
 
-    def send_email_report(self, html_content: str, subject: str, target_month: date) -> bool:
+    def send_email_report(self, html_content: str, subject: str, target_month: date, report_type: str = "monthly",) -> bool:
         """Send email report with error handling."""
         try:
             msg = MIMEMultipart("alternative")
@@ -1063,21 +1063,22 @@ class BudgetAnalyzer:
             html_part = MIMEText(html_content, "html", "utf-8")
             msg_alt.attach(html_part)
 
-            with open(self.cfg.general.spending_type_chart, "rb") as img_file:
-                mime_img = MIMEImage(img_file.read())
-                mime_img.add_header(
-                    "Content-ID", f"<{Path(self.cfg.general.spending_type_chart).stem}>")
-                mime_img.add_header(
-                    "Content-Disposition", "inline", filename=Path(self.cfg.general.spending_type_chart).name)
-                msg.attach(mime_img)
+            if report_type == "yearly":
+                with open(self.cfg.general.spending_type_chart, "rb") as img_file:
+                    mime_img = MIMEImage(img_file.read())
+                    mime_img.add_header(
+                        "Content-ID", f"<{Path(self.cfg.general.spending_type_chart).stem}>")
+                    mime_img.add_header(
+                        "Content-Disposition", "inline", filename=Path(self.cfg.general.spending_type_chart).name)
+                    msg.attach(mime_img)
 
-            with open(self.cfg.general.category_spending_chart, "rb") as img_file:
-                mime_img = MIMEImage(img_file.read())
-                mime_img.add_header(
-                    "Content-ID", f"<{Path(self.cfg.general.category_spending_chart).stem}>")
-                mime_img.add_header(
-                    "Content-Disposition", "inline", filename=Path(self.cfg.general.category_spending_chart).name)
-                msg.attach(mime_img)
+                with open(self.cfg.general.category_spending_chart, "rb") as img_file:
+                    mime_img = MIMEImage(img_file.read())
+                    mime_img.add_header(
+                        "Content-ID", f"<{Path(self.cfg.general.category_spending_chart).stem}>")
+                    mime_img.add_header(
+                        "Content-Disposition", "inline", filename=Path(self.cfg.general.category_spending_chart).name)
+                    msg.attach(mime_img)
 
             tx_file = Path(self.cfg.general.transactions_log_format.format(
                 target_month.strftime("%Y%m")))
@@ -1143,7 +1144,7 @@ class BudgetAnalyzer:
                 if send_email:
                     subject = f"{report_type.title()} Budget Report, {target_month.strftime('%B %Y')}"
                     results["email_sent"] = self.send_email_report(
-                        html_report, subject, target_month)
+                        html_report, subject, target_month, report_type)
 
             return results
 
