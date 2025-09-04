@@ -318,7 +318,7 @@
                 <div class="bar-wrapper">
                   <div
                     class="bar-fill discretionary"
-                    style="width: {{ discretionary_percentage }}%;"
+                    style="width: {{ [discretionary_percentage, 0]|max }}%;"
                   ></div>
                 </div>
               </div>
@@ -331,7 +331,7 @@
                 <div class="bar-wrapper">
                   <div
                     class="bar-fill non-discretionary"
-                    style="width: {{ non_discretionary_percentage }}%;"
+                    style="width: {{ [non_discretionary_percentage, 0]|max }}%;"
                   ></div>
                 </div>
               </div>
@@ -343,7 +343,7 @@
                 <div class="bar-wrapper">
                   <div
                     class="bar-fill savings"
-                    style="width: {{ savings_rate }}%;"
+                    style="width: {{ [savings_rate, 0]|max }}%;"
                   ></div>
                 </div>
               </div>
@@ -355,7 +355,7 @@
                 <div class="bar-wrapper">
                   <div
                     class="bar-fill debt"
-                    style="width: {{ debt_percentage }}%;"
+                    style="width: {{ [debt_percentage, 0]|max }}%;"
                   ></div>
                 </div>
               </div>
@@ -601,7 +601,7 @@
                 <div class="bar-wrapper">
                   <div
                     class="bar-fill discretionary"
-                    style="width: {{ yearly_discretionary_pct }}%;"
+                    style="width: {{ [yearly_discretionary_pct, 0]|max }}%;"
                   ></div>
                 </div>
               </div>
@@ -614,7 +614,7 @@
                 <div class="bar-wrapper">
                   <div
                     class="bar-fill non-discretionary"
-                    style="width: {{ yearly_non_discretionary_pct }}%;"
+                    style="width: {{ [yearly_non_discretionary_pct, 0]|max }}%;"
                   ></div>
                 </div>
               </div>
@@ -626,7 +626,7 @@
                 <div class="bar-wrapper">
                   <div
                     class="bar-fill savings"
-                    style="width: {{ yearly_savings_pct }}%;"
+                    style="width: {{ [yearly_savings_pct, 0]|max }}%;"
                   ></div>
                 </div>
               </div>
@@ -638,7 +638,7 @@
                 <div class="bar-wrapper">
                   <div
                     class="bar-fill debt"
-                    style="width: {{ yearly_debt_pct }}%;"
+                    style="width: {{ [yearly_debt_pct, 0]|max }}%;"
                   ></div>
                 </div>
               </div>
