@@ -885,8 +885,7 @@ class BudgetAnalyzer:
 
         # months
         monthly_labels = []
-        current = date(year_start.year, year_start.month +
-                       1, 1)  # normalize to first of month
+        current = date(year_start.year, year_start.month, 1) + relativedelta(months=1)
         while current <= year_end:
             monthly_labels.append(current.strftime(
                 '%b %Y'))  # e.g., 'Jan 2025'

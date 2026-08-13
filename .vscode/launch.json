@@ -5,12 +5,12 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Python Debugger: Current File with Arguments",
+            "name": "Debug budgetAnalyzer",
             "type": "debugpy",
             "request": "launch",
-            "program": "${file}",
+            "module": "budgetAnalyzer",
             "console": "integratedTerminal",
-            "args": []
+            "args": ["--target-month", "2026-03", "--check-categorization"]
         }
     ]
 }
