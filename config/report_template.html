@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
@@ -273,7 +273,8 @@
             </td>
             <td>
               <div class="metric-value">
-                {{ "{:,.0f}".format(total_expenses / days_in_month).replace(',',' ') }}kr
+                {{ "{:,.0f}".format(total_expenses /
+                days_in_month).replace(',',' ') }}kr
               </div>
               <div class="metric-label">Avg Daily Spending</div>
             </td>
@@ -301,7 +302,8 @@
                       {{ "{:,.0f}".format(category.amount).replace(',',' ') }}kr
                     </td>
                     <td class="amount">
-                      {{ "{:.1f}".format(category.amount / total_income * 100) }}%
+                      {{ "{:.1f}".format(category.amount / total_income * 100)
+                      }}%
                     </td>
                   </tr>
                   {% endfor %}
@@ -312,8 +314,9 @@
               <h3>Spending Type Breakdown</h3>
               <div class="bar-container">
                 <div class="bar-label">
-                  Discretionary: {{ "{:,.0f}".format(discretionary_spending).replace(',',' ')
-                  }}kr ({{ "{:.1f}".format(discretionary_percentage) }}%)
+                  Discretionary: {{
+                  "{:,.0f}".format(discretionary_spending).replace(',',' ') }}kr
+                  ({{ "{:.1f}".format(discretionary_percentage) }}%)
                 </div>
                 <div class="bar-wrapper">
                   <div
@@ -325,8 +328,8 @@
               <div class="bar-container">
                 <div class="bar-label">
                   Non-Discretionary: {{
-                  "{:,.0f}".format(non_discretionary_spending).replace(',',' ') }}kr ({{
-                  "{:.1f}".format(non_discretionary_percentage) }}%)
+                  "{:,.0f}".format(non_discretionary_spending).replace(',',' ')
+                  }}kr ({{ "{:.1f}".format(non_discretionary_percentage) }}%)
                 </div>
                 <div class="bar-wrapper">
                   <div
@@ -337,8 +340,8 @@
               </div>
               <div class="bar-container">
                 <div class="bar-label">
-                  Savings: {{ "{:,.0f}".format(savings_amount).replace(',',' ') }}kr ({{
-                  "{:.1f}".format(savings_rate) }}%)
+                  Savings: {{ "{:,.0f}".format(savings_amount).replace(',',' ')
+                  }}kr ({{ "{:.1f}".format(savings_rate) }}%)
                 </div>
                 <div class="bar-wrapper">
                   <div
@@ -349,8 +352,8 @@
               </div>
               <div class="bar-container">
                 <div class="bar-label">
-                  Debt: {{ "{:,.0f}".format(debt_payments).replace(',',' ') }}kr ({{
-                  "{:.1f}".format(debt_percentage) }}%)
+                  Debt: {{ "{:,.0f}".format(debt_payments).replace(',',' ') }}kr
+                  ({{ "{:.1f}".format(debt_percentage) }}%)
                 </div>
                 <div class="bar-wrapper">
                   <div
@@ -439,8 +442,12 @@
           <tbody>
             <tr>
               <td>Income</td>
-              <td>{{ "{:,.0f}".format(yoy_previous_data[0]).replace(',',' ') }}kr</td>
-              <td>{{ "{:,.0f}".format(quarterly_income).replace(',',' ') }}kr</td>
+              <td>
+                {{ "{:,.0f}".format(yoy_previous_data[0]).replace(',',' ') }}kr
+              </td>
+              <td>
+                {{ "{:,.0f}".format(quarterly_income).replace(',',' ') }}kr
+              </td>
               <td
                 class="{% if yoy_income_change > 0 %}positive{% elif yoy_income_change < 0 %}negative{% else %}neutral{% endif %}"
               >
@@ -449,8 +456,12 @@
             </tr>
             <tr>
               <td>Expenses</td>
-              <td>{{ "{:,.0f}".format(yoy_previous_data[1]).replace(',',' ') }}kr</td>
-              <td>{{ "{:,.0f}".format(quarterly_expenses).replace(',',' ') }}kr</td>
+              <td>
+                {{ "{:,.0f}".format(yoy_previous_data[1]).replace(',',' ') }}kr
+              </td>
+              <td>
+                {{ "{:,.0f}".format(quarterly_expenses).replace(',',' ') }}kr
+              </td>
               <td
                 class="{% if yoy_expenses_change > 0 %}negative{% elif yoy_expenses_change < 0 %}positive{% else %}neutral{% endif %}"
               >
@@ -459,8 +470,12 @@
             </tr>
             <tr>
               <td>Net Flow</td>
-              <td>{{ "{:,.0f}".format(yoy_previous_data[2]).replace(',',' ') }}kr</td>
-              <td>{{ "{:,.0f}".format(quarterly_net_flow).replace(',',' ') }}kr</td>
+              <td>
+                {{ "{:,.0f}".format(yoy_previous_data[2]).replace(',',' ') }}kr
+              </td>
+              <td>
+                {{ "{:,.0f}".format(quarterly_net_flow).replace(',',' ') }}kr
+              </td>
               <td
                 class="{% if yoy_net_flow_change > 0 %}positive{% elif yoy_net_flow_change < 0 %}negative{% else %}neutral{% endif %}"
               >
@@ -521,7 +536,6 @@
             </tr>
           </tbody>
         </table>
-
       </div>
       {% endif %}
 
@@ -580,7 +594,9 @@
                   <tr>
                     <td>{{ yearly_category_labels[i] }}</td>
                     <td class="amount">
-                      {{ "{:,.0f}".format(yearly_category_amounts[i]).replace(',',' ') }}kr
+                      {{
+                      "{:,.0f}".format(yearly_category_amounts[i]).replace(',','
+                      ') }}kr
                     </td>
                     <td class="amount">
                       {{ "{:.1f}".format(yearly_category_amounts[i] /
@@ -595,7 +611,8 @@
               <h3>Annual Spending Type Breakdown</h3>
               <div class="bar-container">
                 <div class="bar-label">
-                  Discretionary: {{ "{:,.0f}".format(yearly_discretionary).replace(',',' ') }}kr
+                  Discretionary: {{
+                  "{:,.0f}".format(yearly_discretionary).replace(',',' ') }}kr
                   ({{ "{:.1f}".format(yearly_discretionary_pct) }}%)
                 </div>
                 <div class="bar-wrapper">
@@ -608,8 +625,8 @@
               <div class="bar-container">
                 <div class="bar-label">
                   Non-Discretionary: {{
-                  "{:,.0f}".format(yearly_non_discretionary).replace(',',' ') }}kr ({{
-                  "{:.1f}".format(yearly_non_discretionary_pct) }}%)
+                  "{:,.0f}".format(yearly_non_discretionary).replace(',',' ')
+                  }}kr ({{ "{:.1f}".format(yearly_non_discretionary_pct) }}%)
                 </div>
                 <div class="bar-wrapper">
                   <div
@@ -620,8 +637,8 @@
               </div>
               <div class="bar-container">
                 <div class="bar-label">
-                  Savings: {{ "{:,.0f}".format(yearly_savings).replace(',',' ') }}kr ({{
-                  "{:.1f}".format(yearly_savings_pct) }}%)
+                  Savings: {{ "{:,.0f}".format(yearly_savings).replace(',',' ')
+                  }}kr ({{ "{:.1f}".format(yearly_savings_pct) }}%)
                 </div>
                 <div class="bar-wrapper">
                   <div
@@ -632,8 +649,8 @@
               </div>
               <div class="bar-container">
                 <div class="bar-label">
-                  Debt: {{ "{:,.0f}".format(yearly_debt).replace(',',' ') }}kr ({{
-                  "{:.1f}".format(yearly_debt_pct) }}%)
+                  Debt: {{ "{:,.0f}".format(yearly_debt).replace(',',' ') }}kr
+                  ({{ "{:.1f}".format(yearly_debt_pct) }}%)
                 </div>
                 <div class="bar-wrapper">
                   <div
@@ -657,7 +674,9 @@
                   <tr>
                     <td>{{ yearly_income_labels[i] }}</td>
                     <td class="amount">
-                      {{ "{:,.0f}".format(yearly_income_amounts[i]).replace(',',' ') }}kr
+                      {{
+                      "{:,.0f}".format(yearly_income_amounts[i]).replace(',','
+                      ') }}kr
                     </td>
                     <td class="amount">
                       {{ "{:.1f}".format(yearly_income_amounts[i] /

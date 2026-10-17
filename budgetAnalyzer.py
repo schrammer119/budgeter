@@ -150,11 +150,11 @@ class BudgetAnalyzer:
         text = re.sub(r"\s+", " ", text).strip()
         return text
 
-    def _categorize_transactions(self, transactions: List[Transaction]) -> None:
+    def _categorize_transactions(self, transactions: List[Transaction], force_update: bool = False) -> None:
         """Categorize transactions based on description keywords."""
 
         for tx in transactions:
-            if tx.category:
+            if tx.category and not force_update:
                 continue  # Already categorized
 
             scored_list = []
@@ -1181,7 +1181,10 @@ class BudgetAnalyzer:
             transactions = self.db.get_transactions(month_start, month_end)
 
             # Categorize transactions
-            self._categorize_transactions(transactions)
+            self._categorize_transactions(transactions, force_update=True)
+
+            # Persist only the transactions selected for this target month.
+            updated_count = self.db.update_transaction_categories(transactions)
 
             # Save to Excel log for review
             dicts = [tx.to_dict() for tx in transactions]
@@ -1202,6 +1205,7 @@ class BudgetAnalyzer:
             return {
                 "success": True,
                 "total_transactions": len(transactions),
+                "database_updated_count": updated_count,
                 "uncategorized_count": len(uncategorized),
                 "low_confidence_count": len(low_confidence),
                 "excel_file": excel_file,
@@ -1283,6 +1287,8 @@ def main():
             if results["success"]:
                 print(
                     f"✓ Processed {results['total_transactions']} transactions")
+                print(
+                    f"✓ Updated database categories for {results['database_updated_count']} transactions")
                 print(f"✓ Saved to: {results['excel_file']}")
 
                 if results['uncategorized_count'] > 0:

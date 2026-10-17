@@ -10,7 +10,7 @@
             "request": "launch",
             "module": "budgetAnalyzer",
             "console": "integratedTerminal",
-            "args": ["--target-month", "2026-03", "--check-categorization"]
+            "args": ["--target-month", "2025-07", "--check-categorization"]
         }
     ]
 }
